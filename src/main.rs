@@ -1,22 +1,22 @@
-use std::fmt::{Display, Pointer};
-use axum::{
-    routing::{get, post, delete},
-    extract::{Path, Request},
-    http::StatusCode,
-    Json, Router,
-    response::Response,
-    middleware::{self, Next},
-    body::Body,
-};
 use axum::body::HttpBody;
 use axum::handler::Handler;
+use axum::response::IntoResponse;
+use axum::{
+    body::Body,
+    extract::Path,
+    http::{Request, StatusCode},
+    middleware::{self, Next},
+    response::Response,
+    routing::{delete, get, post, put},
+    Json, Router,
+};
 use serde::{Deserialize, Serialize};
-use validator::Validate;
+use std::fmt::{Display, Pointer};
 use tracing::error;
-
+use validator::Validate;
 
 // the input to our `create_user` handler
-#[derive(Deserialize)]
+#[derive(Deserialize, Debug)]
 struct CreateUser {
     id: u64,
     username: String,
@@ -31,22 +31,16 @@ struct User {
     address: String,
 }
 
-async fn my_middleware(
-    request: Request<Body>,
-    next: Next,
-) -> Response {
+async fn my_middleware(request: Request<Body>, next: Next) -> Response {
     // do something with `request`...
     println!("my middleware start");
     let request_info = format!("{:?}", &request.body());
     let response = next.run(request).await;
     let status = response.status();
     println!("my middleware end {:?} {:?}", status, response);
-    if status == StatusCode::UNPROCESSABLE_ENTITY{
+    if status == StatusCode::UNPROCESSABLE_ENTITY {
         println!("err middleware {}", status);
-        error!(
-            "\n\nStatus {}\nRequest: {:?} \n",
-            status, request_info
-        );
+        error!("\n\nStatus {}\nRequest: {:?} \n", status, request_info);
     }
     // do something with `response`...
     response
@@ -62,11 +56,12 @@ async fn main() {
         // `GET /` goes to `root`
         .route("/", get(root))
         // `POST /users` goes to `create_user`
-        .route("/users", post(create_user))
+        .route("/users", post(add_update_user))
         .route("/users/:user_id", get(get_user))
+        .route("/users/:user_id", put(add_update_user))
         .route("/users/:user_id/delete", delete(delete_user))
         .layer(middleware::from_fn(my_middleware));
-        // .layer(TraceLayer::new_for_http());
+    // .layer(TraceLayer::new_for_http());
 
     // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
@@ -81,14 +76,24 @@ async fn root() -> &'static str {
     "Hello, World! 123"
 }
 
-async fn create_user(
-    // this argument tells axum to parse the request body
-    // as JSON into a `CreateUser` type
-    Json(payload): Json<CreateUser>,
-) -> (StatusCode, Json<User>) {
-    // insert your application logic here
+async fn add_update_user(path: Option<Path<String>>, Json(payload): Json<CreateUser>) -> Response {
+    println!("User id {:?} {:?}", path, payload);
+    let user_id = match path {
+        Some(val) => {
+            let is_num = val.0.parse::<u64>();
+            if is_num.is_ok() {
+                is_num.unwrap()
+            } else {
+                0
+            }
+        }
+        None => payload.id,
+    };
+    if user_id == 0 {
+        return StatusCode::BAD_REQUEST.into_response();
+    }
     let user = User {
-        id: payload.id,
+        id: user_id,
         username: payload.username,
         address: String::from("Any where"),
     };
@@ -112,11 +117,11 @@ async fn create_user(
     }
     // this will be converted into a JSON response
     // with a status code of `201 Created`
-    (StatusCode::CREATED, Json(user))
+    Json(user).into_response()
 }
 
 async fn get_user(Path(user_id): Path<String>) -> (StatusCode, Json<User>) {
-    let user = User{
+    let user = User {
         id: user_id.parse::<u64>().unwrap(),
         username: String::from("hello ") + &user_id,
         address: String::from("hello world"),
@@ -126,8 +131,8 @@ async fn get_user(Path(user_id): Path<String>) -> (StatusCode, Json<User>) {
 
 async fn delete_user(Path(user_id): Path<String>) -> StatusCode {
     let user_id = user_id;
-    if user_id != "1"{
-        return StatusCode::NO_CONTENT
+    if user_id != "1" {
+        return StatusCode::NO_CONTENT;
     }
     StatusCode::OK
 }
