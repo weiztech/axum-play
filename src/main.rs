@@ -79,14 +79,7 @@ async fn root() -> &'static str {
 async fn add_update_user(path: Option<Path<String>>, Json(payload): Json<CreateUser>) -> Response {
     println!("User id {:?} {:?}", path, payload);
     let user_id = match path {
-        Some(val) => {
-            let is_num = val.0.parse::<u64>();
-            if is_num.is_ok() {
-                is_num.unwrap()
-            } else {
-                0
-            }
-        }
+        Some(val) => val.0.parse::<u64>().unwrap_or(0),
         None => payload.id,
     };
     if user_id == 0 {
