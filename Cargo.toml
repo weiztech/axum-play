@@ -6,15 +6,19 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum = { git = "https://github.com/tokio-rs/axum.git" }
 bb8 = "0.8.1"
 bb8-postgres = "0.8.1"
 serde_json="1.0.104"
 tracing = "0.1.37"
+http-body-util = "0.1.0"
+
+[dependencies.axum]
+version = "0.7.1"
+features = ["macros"]
 
 [dependencies.tracing-subscriber]
 version = "0.3.17"
-features = ["env-filter"]
+features = ["env-filter", "json"]
 
 
 [dependencies.serde]
@@ -45,13 +49,20 @@ features = ["with-chrono-0_4", "with-uuid-1"]
 version = "0.2.5"
 features = ["derive"]
 
-[dependencies.tower-http]
+[dependencies.tower]
 version = "0.4.3"
-features = ["trace"]
+features = ["timeout"]
+
+[dependencies.tower-http]
+version = "0.5.0"
+features = ["trace", "request-id", "sensitive-headers"]
 
 [dependencies.validator]
 version = "0.16.1"
 features = ["derive"]
+
+[dependencies.hyper]
+version = "0.14.27"
 
 [dev-dependencies]
 cargo-watch = "8.4.0"

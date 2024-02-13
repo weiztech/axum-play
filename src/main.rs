@@ -1,31 +1,50 @@
-use std::env;
+extern crate core;
+
+mod users;
+mod common;
+
+use common::error::{AppError, InvalidPayload};
+use common::extractor::{JSONValidate};
+
+use std::string::String;
 use axum::body::HttpBody;
 use axum::handler::Handler;
 use axum::response::IntoResponse;
 use axum::{
+    debug_handler,
     body::{Body, Bytes},
-    extract::{Path, MatchedPath},
-    http::{Request, StatusCode, HeaderMap},
+    error_handling::HandleErrorLayer,
+    extract::{DefaultBodyLimit, MatchedPath, Path, Request},
+    http::{HeaderMap, HeaderName, Method, StatusCode, Uri},
     middleware::{self, Next},
     response::Response,
     routing::{delete, get, post, put},
-    Json, Router,
+    BoxError, Json, RequestPartsExt, Router,
 };
-use std::time::Duration;
+use http_body_util::BodyExt;
+use http_body_util::Full;
 use serde::{Deserialize, Serialize};
+use std::env;
 use std::fmt::{Display, Pointer};
+use std::time::Duration;
+use tokio::time::sleep;
+use tower::ServiceBuilder;
+use tower_http::sensitive_headers::SetSensitiveHeadersLayer;
+use tower_http::trace::{self};
 use tower_http::{
     classify::ServerErrorsFailureClass,
-    trace::TraceLayer,
     classify::StatusInRangeAsFailures,
+    trace::{DefaultMakeSpan, TraceLayer, DefaultOnRequest},
 };
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
 use tracing::error;
+use tracing::{info, Level};
 use tracing::{info_span, Span};
+use tracing_subscriber::fmt::layer;
+use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
 use validator::Validate;
 
 // the input to our `create_user` handler
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize, Debug, Clone)]
 struct CreateUser {
     id: u64,
     username: String,
@@ -33,14 +52,14 @@ struct CreateUser {
 
 // the output to our `create_user` handler
 #[derive(Validate, Debug, Serialize, Deserialize)]
-struct User {
+struct User<'a> {
     id: u64,
     #[validate(length(max = 1))]
-    username: String,
-    address: String,
+    username: &'a str,
+    address: &'a str,
 }
 
-async fn my_middleware(request: Request<Body>, next: Next) -> Response {
+async fn my_middleware(request: Request, next: Next) -> Response {
     // do something with `request`...
     println!("my middleware start");
     let request_info = format!("{:?}", &request.body());
@@ -59,6 +78,44 @@ async fn my_middleware(request: Request<Body>, next: Next) -> Response {
     response
 }
 
+async fn new_middleware(request: Request, next: Next) -> Response {
+    let (parts, body) = request.into_parts();
+    let p_parts = format!("{:?}", parts);
+
+    // this wont work if the body is an long running stream
+    let bytes = body
+        .collect()
+        .await
+        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())
+        .unwrap()
+        .to_bytes();
+
+    let response = next
+        .run(Request::from_parts(parts, Body::from(bytes.clone())))
+        .await;
+    let status_code = response.status();
+    if status_code != StatusCode::OK && status_code != StatusCode::CREATED {
+        error!(
+            "\nStatus {}\nRequest: {:?}\nBody: {:?}",
+            status_code, p_parts, &bytes
+        );
+    }
+    info!("Response new Middleware {:?}", response);
+    response
+}
+
+async fn handle_timeout_error(
+    // `Method` and `Uri` are extractors so they can be used here
+    method: Method,
+    uri: Uri,
+    // the last argument must be the error itself
+    err: BoxError,
+) -> (StatusCode, String) {
+    let message = format!("`{} {}` failed with {}", method, uri, err);
+    error!("TIMEOUT: {message}");
+    (StatusCode::INTERNAL_SERVER_ERROR, message)
+}
+
 #[tokio::main]
 async fn main() {
     // initialize tracing
@@ -73,88 +130,76 @@ async fn main() {
         .with(tracing_subscriber::fmt::layer())
         .init();
 
+    // let handle_logging = ServiceBuilder::new()
+    //     .layer(HandleErrorLayer::new(handle_timeout_error));
+
+    let trace_layer_http = TraceLayer::new_for_http()
+        .make_span_with(|request: &Request<Body>| {
+            tracing::error_span!("\nHTTP Request ",
+                "\nUrl: {:?}\nHeaders: {:?}\n",
+                request.uri().path_and_query(),
+                request.headers()
+            )
+        });
+        /*
+        .on_request(());
+        .on_response(
+            |response: &Response<Body>, latency: Duration, _span: &Span| {
+                println!("SPAN RESP {:?}", _span);
+                let message = format!(
+                    "\nHTTP {:?} - \nHTTP Response Time: ({:?})",
+                    response, latency
+                );
+                if response.status().is_success() {
+                    tracing::info!(message);
+                } else {
+                    tracing::error!(message)
+                }
+            },
+        )
+        .on_eos(
+            |trailers: Option<&HeaderMap>, stream_duration: Duration, _span: &Span| {
+                tracing::error!("stream closed after {:?}", stream_duration)
+            },
+        )
+        .on_failure(
+            |error: ServerErrorsFailureClass, latency: Duration, _span: &Span| {
+                tracing::error!("something went wrong")
+            },
+        );*/
+
+    let api_routes_v1 = Router::new()
+        .nest("/login", users::routes::login_routes());
 
     // build our application with a route
     let app = Router::new()
         // `GET /` goes to `root`
+        .nest("/api/v1", api_routes_v1)
         .route("/", get(root))
         // `POST /users` goes to `create_user`
         .route("/users", post(add_update_user))
         .route("/users/:user_id", get(get_user))
         .route("/users/:user_id", put(add_update_user))
         .route("/users/:user_id/delete", delete(delete_user))
-        .layer(middleware::from_fn(my_middleware))
         .layer(
-            TraceLayer::new(
-                StatusInRangeAsFailures::new(400..=599).into_make_classifier()
-            )
-                /*.on_request(|_request: &Request<_>, _span: &Span| {
-                    // You can use `_span.record("some_other_field", value)` in one of these
-                    // closures to attach a value to the initially empty field in the info_span
-                    // created above.
-                    tracing::error!("Req DEBUG {:?}", _request);
-                    tracing::error!("Req Span {:?}", _span);
-                })
-                .on_response(|_response: &Response, _latency: Duration, _span: &Span| {
-                    // ...
-                    tracing::error!("Resp {:?}", _response);
-                })
-                .on_body_chunk(|_chunk: &Bytes, _latency: Duration, _span: &Span| {
-                    tracing::error!("Body {:?}", _chunk);
-                    // ...
-                })*/
-        )
-        .layer(
-            TraceLayer::new_for_http()
-                .make_span_with(|request: &Request<_>| {
-                    // Log the matched route's path (with placeholders not filled in).
-                    // Use request.uri() or OriginalUri if you want the real path.
-                    let matched_path = request
-                        .extensions()
-                        .get::<MatchedPath>()
-                        .map(MatchedPath::as_str);
-
-                    info_span!(
-                        "http_requestX",
-                        method = ?request.method(),
-                        headers = ?request.headers(),
-                        path = matched_path,
-                        presto = "123123",
-                        some_other_field = tracing::field::Empty,
-                    )
-                })
-                /*.on_request(|_request: &Request<_>, _span: &Span| {
-                    // You can use `_span.record("some_other_field", value)` in one of these
-                    // closures to attach a value to the initially empty field in the info_span
-                    // created above.
-                    tracing::info!("Req {:?}", _request);
-                    tracing::info!("Req Span {:?}", _span);
-                })*/
-                .on_response(|_response: &Response, _latency: Duration, _span: &Span| {
-                    // ...
-                    tracing::info!("Resp {:?}", _response);
-                    tracing::info!("Resp Latency {:?}", _latency);
-                    tracing::info!("Resp Span {:?}", _span);
-                })
-                .on_body_chunk(|_chunk: &Bytes, _latency: Duration, _span: &Span| {
-                    tracing::info!("Body {:?}", _chunk);
-                    tracing::info!("Body SPAN {:?}", _span);
-                    // ...
-                })
-                .on_eos(
-                    |_trailers: Option<&HeaderMap>, _stream_duration: Duration, _span: &Span| {
-                        tracing::info!("EOS {:?}", _trailers);
-                    },
-                )
-                .on_failure(
-                    |_error: ServerErrorsFailureClass, _latency: Duration, _span: &Span| {
-                        // tracing::error!("on Failure ERRRRR {:?}", _error);
-                    },
-                ),
+            ServiceBuilder::new()
+                // BODY LIMIT 100 KB
+                .layer(DefaultBodyLimit::max(100000))
+                // Should response within max 10 seconds
+                .layer(HandleErrorLayer::new(|_: BoxError| async {
+                    StatusCode::REQUEST_TIMEOUT
+                }))
+                .timeout(Duration::from_secs(10))
+                .layer(SetSensitiveHeadersLayer::new([
+                    HeaderName::from_static("user-agent"),
+                    HeaderName::from_static("postman-token"),
+                ]))
+                .layer(trace_layer_http),
         );
 
     // run our app with hyper, listening globally on port 3000
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000"
+    ).await.unwrap();
     tracing::debug!("De debug 12312");
     tracing::info!("De INFO 123");
     tracing::error!("Err logg");
@@ -162,27 +207,43 @@ async fn main() {
 }
 
 // basic handler that responds with a static string
-async fn root() -> &'static str {
-    "Hello, World! 123"
+async fn root() -> impl IntoResponse {
+    // sleep(Duration::from_secs(2)).await;
+    (StatusCode::OK, "Hello, World! 123")
 }
 
-async fn add_update_user(path: Option<Path<String>>, Json(payload): Json<CreateUser>) -> Response {
+#[debug_handler]
+async fn add_update_user(
+    path: Option<Path<String>>,
+    JSONValidate(Json(payload)): JSONValidate<Json<CreateUser>>) -> impl IntoResponse {
     println!("User id {:?} {:?}", path, payload);
     let user_id = match path {
         Some(val) => val.0.parse::<u64>().unwrap_or(0),
         None => payload.id,
     };
     if user_id == 0 {
-        return StatusCode::BAD_REQUEST.into_response();
+        // return StatusCode::BAD_REQUEST.into_response()
+        return AppError::UnexpectedError.into_response()
     }
+
+    if payload.id == 1 {
+        return AppError::FatalError(
+            format!("{} {:?}", "Error Found, Please check", payload),
+        ).into_response()
+        // panic!("Errr");
+    }else if payload.id == 2  {
+        return InvalidPayload(payload).into_response()
+    }
+
+    let address = format!("Address {}", payload.username);
     let user = User {
         id: user_id,
-        username: payload.username,
-        address: String::from("Any where"),
+        username: payload.username.as_str(),
+        address: address.as_str(),
     };
-    if payload.id == 1 {
-        panic!("Errr")
-    };
+    info!("add update user {:?}", user);
+    let validate = user.validate();
+    println!("Validate {:?}", validate);
     let data = r#"
     {
         "id": 43,
@@ -203,13 +264,15 @@ async fn add_update_user(path: Option<Path<String>>, Json(payload): Json<CreateU
     Json(user).into_response()
 }
 
-async fn get_user(Path(user_id): Path<String>) -> (StatusCode, Json<User>) {
+#[debug_handler]
+async fn get_user(Path(user_id): Path<String>) -> Response {
+    let username_id = user_id.clone() + " Hhaha";
     let user = User {
         id: user_id.parse::<u64>().unwrap(),
-        username: String::from("hello ") + &user_id,
-        address: String::from("hello world"),
+        username: &username_id,
+        address: "Hello World",
     };
-    (StatusCode::OK, Json(user))
+    Json(user).into_response()
 }
 
 async fn delete_user(Path(user_id): Path<String>) -> StatusCode {
