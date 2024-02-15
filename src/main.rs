@@ -44,9 +44,13 @@ use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
 use validator::Validate;
 
 // the input to our `create_user` handler
-#[derive(Deserialize, Debug, Clone)]
+#[derive(Deserialize, Debug, Clone, Validate)]
 struct CreateUser {
     id: u64,
+    #[validate(
+    length(min = 5, message="exceed allowed min"),
+    length(max = 10, message="exceed allowed max"),
+    )]
     username: String,
 }
 
