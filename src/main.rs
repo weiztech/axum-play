@@ -54,6 +54,7 @@ struct CreateUser {
     username: String,
 }
 
+
 // the output to our `create_user` handler
 #[derive(Validate, Debug, Serialize, Deserialize)]
 struct User<'a> {
@@ -256,8 +257,10 @@ async fn add_update_user(
     }"#;
     let data = serde_json::from_str::<User>(data);
     match data {
-        Ok(person) => {
+        Ok(ref person) => {
             println!("Deserialized person: {:?}", person);
+            let json_data = serde_json::to_string(&data.unwrap());
+            println!("JSON DATA - {:?}", json_data);
         }
         Err(error) => {
             println!("Failed to deserialize data. Error: {}", error);
