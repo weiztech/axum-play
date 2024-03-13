@@ -5,6 +5,9 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use std::fmt::Debug;
 use std::ops::{Deref, DerefMut};
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
+use tracing_subscriber::fmt::format::json;
 use validator::{Validate, ValidationErrors};
 
 pub trait ValidateValue {
@@ -19,6 +22,12 @@ impl<T: Debug + Validate> ValidateValue for Json<T> {
         self.0.validate()
     }
 }
+
+#[derive(Debug, Serialize)]
+pub struct ErrorResponse{
+    message: String
+}
+
 
 #[derive(Debug)]
 pub enum ValidateRejection {
@@ -40,51 +49,43 @@ impl From<ValidationErrors> for ValidateRejection {
 
 impl IntoResponse for ValidateRejection {
     fn into_response(self) -> Response {
-        println!("ValidateRejection {:?}", self);
+        // println!("ValidateRejection {:?}", self);
         match self {
             ValidateRejection::ValidationErrors(err) => {
-                (StatusCode::BAD_REQUEST, axum::Json(err)).into_response()
+                let message = err.to_string().replace('\n', ", ");
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse{ message })
+                ).into_response()
             }
-            ValidateRejection::JsonRejection(err) => err.into_response(),
+            ValidateRejection::JsonRejection(err) => (
+                (
+                    StatusCode::BAD_REQUEST,
+                    Json(ErrorResponse{ message: err.body_text() })
+                ).into_response()
+            ),
         }
     }
 }
 
+#[derive(Debug)]
 pub struct JSONValidate<T>(pub T);
 
-impl<T: IntoResponse> From<T> for JSONValidate<T> {
-    fn from(inner: T) -> Self {
-        Self(inner)
-    }
-}
-
-impl<E> Deref for JSONValidate<E> {
-    type Target = E;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<E> DerefMut for JSONValidate<E> {
-    fn deref_mut(&mut self) -> &mut Self::Target {
-        &mut self.0
-    }
-}
 
 #[async_trait]
 impl<T, S> FromRequest<S> for JSONValidate<T>
 where
     S: Send + Sync,
-    T: FromRequest<S> + Debug + ValidateValue,
-    ValidateRejection: From<<T as FromRequest<S>>::Rejection>,
+    T: DeserializeOwned + Validate,
+    // Json<T>: FromRequest<S, Rejection = ValidateRejection>,
+    // ValidateRejection: From<<T as FromRequest<S>>::Rejection>,
 {
     type Rejection = ValidateRejection;
 
     async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
-        let value = T::from_request(req, state).await?;
+        let Json(value) = Json::<T>::from_request(req, state).await?;
         // value.validate().expect("TODO: panic message");
-        println!("JSONValidatet HERE {:?}", value.validate());
+        // println!("JSONValidatet HERE {:?}", value.validate());
         value.validate()?;
         Ok(Self(value))
     }

@@ -3,7 +3,7 @@ extern crate core;
 mod users;
 mod common;
 
-use common::error::{AppError, InvalidPayload};
+use common::error::{AppError, InvalidPayload, internal_error};
 use common::extractor::{JSONValidate};
 
 use std::string::String;
@@ -11,11 +11,12 @@ use axum::body::HttpBody;
 use axum::handler::Handler;
 use axum::response::IntoResponse;
 use axum::{
+    async_trait,
     debug_handler,
     body::{Body, Bytes},
     error_handling::HandleErrorLayer,
-    extract::{DefaultBodyLimit, MatchedPath, Path, Request},
-    http::{HeaderMap, HeaderName, Method, StatusCode, Uri},
+    extract::{DefaultBodyLimit, MatchedPath, Path, Request, State, FromRequestParts, FromRef},
+    http::{HeaderMap, HeaderName, Method, StatusCode, Uri, request::Parts},
     middleware::{self, Next},
     response::Response,
     routing::{delete, get, post, put},
@@ -27,6 +28,7 @@ use serde::{Deserialize, Serialize};
 use std::env;
 use std::fmt::{Display, Pointer};
 use std::time::Duration;
+use axum::extract::FromRequest;
 use tokio::time::sleep;
 use tower::ServiceBuilder;
 use tower_http::sensitive_headers::SetSensitiveHeadersLayer;
@@ -43,6 +45,10 @@ use tracing_subscriber::fmt::layer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
 use validator::Validate;
 
+use bb8::{Pool, PooledConnection};
+use bb8_postgres::PostgresConnectionManager;
+use tokio_postgres::NoTls;
+
 // the input to our `create_user` handler
 #[derive(Deserialize, Debug, Clone, Validate)]
 struct CreateUser {
@@ -52,6 +58,11 @@ struct CreateUser {
     length(max = 10, message="exceed allowed max"),
     )]
     username: String,
+    #[validate(
+    length(min = 3, message="exceed allowed min"),
+    length(max = 7, message="exceed allowed max"),
+    )]
+    address: String
 }
 
 
@@ -173,14 +184,20 @@ async fn main() {
             },
         );*/
 
+    let manager =
+        PostgresConnectionManager::new_from_stringlike(
+            env::var("DATABASE_STRING").unwrap_or(String::from("")), NoTls
+        ).unwrap();
+    let pool = Pool::builder().build(manager).await.unwrap();
+
     let api_routes_v1 = Router::new()
-        .nest("/login", users::routes::login_routes());
+        .nest("/auth", users::routes::login_routes());
 
     // build our application with a route
     let app = Router::new()
         // `GET /` goes to `root`
-        .nest("/api/v1", api_routes_v1)
         .route("/", get(root))
+        .nest("/api/v1", api_routes_v1)
         // `POST /users` goes to `create_user`
         .route("/users", post(add_update_user))
         .route("/users/:user_id", get(get_user))
@@ -200,7 +217,8 @@ async fn main() {
                     HeaderName::from_static("postman-token"),
                 ]))
                 .layer(trace_layer_http),
-        );
+        )
+        .with_state(pool);
 
     // run our app with hyper, listening globally on port 3000
     let listener = tokio::net::TcpListener::bind("0.0.0.0:3000"
@@ -211,16 +229,28 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
+type ConnectionPool = Pool<PostgresConnectionManager<NoTls>>;
+
 // basic handler that responds with a static string
-async fn root() -> impl IntoResponse {
+
+#[debug_handler(state=ConnectionPool)]
+async fn root(DatabaseConnection(conn): DatabaseConnection) -> Result<impl IntoResponse, AppError> {
+    // let conn = pool.get().await.map_err(internal_error)?;
+    println!("Conn {:?}", conn);
+    let row = conn
+        .query_one("select 1 + 1", &[])
+        .await
+        .map_err(internal_error)?;
+    let two: i32 = row.try_get(0).map_err(internal_error)?;
+    println!("Value {:?} {}", row, two);
     // sleep(Duration::from_secs(2)).await;
-    (StatusCode::OK, "Hello, World! 123")
+    Ok((StatusCode::OK, String::from("Hello World")))
 }
 
 #[debug_handler]
 async fn add_update_user(
     path: Option<Path<String>>,
-    JSONValidate(Json(payload)): JSONValidate<Json<CreateUser>>) -> impl IntoResponse {
+    JSONValidate(payload): JSONValidate<CreateUser>) -> impl IntoResponse {
     println!("User id {:?} {:?}", path, payload);
     let user_id = match path {
         Some(val) => val.0.parse::<u64>().unwrap_or(0),
@@ -288,4 +318,24 @@ async fn delete_user(Path(user_id): Path<String>) -> StatusCode {
         return StatusCode::NO_CONTENT;
     }
     StatusCode::OK
+}
+
+struct DatabaseConnection(PooledConnection<'static, PostgresConnectionManager<NoTls>>);
+
+#[async_trait]
+impl<S> FromRequestParts<S> for DatabaseConnection
+    where
+        ConnectionPool: FromRef<S>,
+        S: Send + Sync,
+{
+    type Rejection = AppError;
+
+    async fn from_request_parts(_parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
+        let pool = ConnectionPool::from_ref(state);
+        let conn = pool.get_owned().await.map_err(
+            internal_error
+        )?;
+        println!("Pool {:?} {:?}", pool, conn);
+        Ok(Self(conn))
+    }
 }

@@ -32,3 +32,11 @@ where
         (StatusCode::BAD_REQUEST, "Invalid Payload").into_response()
     }
 }
+
+
+pub fn internal_error<E>(err: E) -> AppError
+    where
+        E: std::error::Error,
+{
+    AppError::UnexpectedError
+}

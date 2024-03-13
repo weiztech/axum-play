@@ -1,23 +1,16 @@
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize};
+use chrono::{DateTime, Utc};
 
 #[derive(Deserialize, Debug)]
 struct User {
     id: u64,
     email: String,
-    first_name: String,
-    last_name: String,
+    image: Option<String>,
     slug: String,
-}
-
-#[derive(Debug, Deserialize)]
-pub struct UserPasswordLogin {
-    email: String,
     password: String,
-}
-
-#[derive(Debug)]
-pub struct UserRegisterPassword {
-    email: String,
-    password: String,
-    new_password: String,
+    first_name: Option<String>,
+    last_name: Option<String>,
+    create_at: DateTime<Utc>,
+    update_at: Option<DateTime<Utc>>,
+    last_login: Option<DateTime<Utc>>,
 }
