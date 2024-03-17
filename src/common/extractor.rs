@@ -25,7 +25,7 @@ impl<T: Debug + Validate> ValidateValue for Json<T> {
 
 #[derive(Debug, Serialize)]
 pub struct ErrorResponse{
-    message: String
+    messages: Vec<String>
 }
 
 
@@ -52,16 +52,18 @@ impl IntoResponse for ValidateRejection {
         // println!("ValidateRejection {:?}", self);
         match self {
             ValidateRejection::ValidationErrors(err) => {
-                let message = err.to_string().replace('\n', ", ");
+                let messages: Vec<String> = err.to_string().split("\n").map(
+                    |s| s.to_string()
+                ).collect();
                 (
                     StatusCode::BAD_REQUEST,
-                    Json(ErrorResponse{ message })
+                    Json(ErrorResponse{ messages })
                 ).into_response()
             }
             ValidateRejection::JsonRejection(err) => (
                 (
                     StatusCode::BAD_REQUEST,
-                    Json(ErrorResponse{ message: err.body_text() })
+                    Json(ErrorResponse{ messages: vec![err.body_text();1] })
                 ).into_response()
             ),
         }

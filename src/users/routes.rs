@@ -6,10 +6,10 @@ use crate::users::views::{
 };
 
 
-pub fn login_routes() -> Router<ConnectionPool>{
+pub fn auth_routes() -> Router<ConnectionPool>{
     Router::new()
         .route("/password", post(password_login))
-        // .route("/register", post(user_register))
+        .route("/register", post(user_register))
 }
 
 /*

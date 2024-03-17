@@ -2,7 +2,7 @@ use serde::{Deserialize};
 use chrono::{DateTime, Utc};
 
 #[derive(Deserialize, Debug)]
-struct User {
+pub struct User {
     id: u64,
     email: String,
     image: Option<String>,

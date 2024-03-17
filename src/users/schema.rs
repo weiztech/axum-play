@@ -18,10 +18,14 @@ pub(crate) struct UserPasswordLogin {
 
 #[derive(Debug, Validate, Deserialize)]
 pub(crate) struct UserRegisterPassword {
+    #[validate(length(min=3, max=254))]
+    pub first_name: String,
+    #[validate(length(min=3, max=254))]
+    pub last_name: Option<String>,
     #[validate(email, length(min=5, max=254))]
-    email: String,
+    pub email: String,
     #[validate(length(min=5, max=254), must_match="new_password")]
-    password: String,
+    pub password: String,
     #[validate(length(min=5, max=254))]
     new_password: String,
 }

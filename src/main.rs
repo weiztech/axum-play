@@ -190,14 +190,14 @@ async fn main() {
         ).unwrap();
     let pool = Pool::builder().build(manager).await.unwrap();
 
-    let api_routes_v1 = Router::new()
-        .nest("/auth", users::routes::login_routes());
+    let auth_routes = Router::new()
+        .nest("/auth", users::routes::auth_routes());
 
     // build our application with a route
     let app = Router::new()
         // `GET /` goes to `root`
         .route("/", get(root))
-        .nest("/api/v1", api_routes_v1)
+        .nest("/", auth_routes)
         // `POST /users` goes to `create_user`
         .route("/users", post(add_update_user))
         .route("/users/:user_id", get(get_user))
@@ -335,7 +335,6 @@ impl<S> FromRequestParts<S> for DatabaseConnection
         let conn = pool.get_owned().await.map_err(
             internal_error
         )?;
-        println!("Pool {:?} {:?}", pool, conn);
         Ok(Self(conn))
     }
 }
