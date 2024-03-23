@@ -1,13 +1,11 @@
+use crate::common::response::ErrorResponse;
 use axum::async_trait;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{FromRequest, Json, Request};
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
-use std::fmt::Debug;
-use std::ops::{Deref, DerefMut};
 use serde::de::DeserializeOwned;
-use serde::{Deserialize, Serialize};
-use tracing_subscriber::fmt::format::json;
+use std::fmt::Debug;
 use validator::{Validate, ValidationErrors};
 
 pub trait ValidateValue {
@@ -17,22 +15,23 @@ pub trait ValidateValue {
 #[async_trait]
 impl<T: Debug + Validate> ValidateValue for Json<T> {
     fn validate(&self) -> Result<(), ValidationErrors> {
-        println!("Validate {:?}", self.0.validate());
-        println!("ExtractValue {:?}", self);
         self.0.validate()
     }
 }
-
-#[derive(Debug, Serialize)]
-pub struct ErrorResponse{
-    messages: Vec<String>
-}
-
 
 #[derive(Debug)]
 pub enum ValidateRejection {
     JsonRejection(JsonRejection),
     ValidationErrors(ValidationErrors),
+}
+
+impl ValidateRejection {
+    fn to_error_response(self) -> ErrorResponse {
+        match self {
+            ValidateRejection::ValidationErrors(err) => ErrorResponse::from(err),
+            ValidateRejection::JsonRejection(err) => ErrorResponse::from(err),
+        }
+    }
 }
 
 impl From<JsonRejection> for ValidateRejection {
@@ -49,56 +48,28 @@ impl From<ValidationErrors> for ValidateRejection {
 
 impl IntoResponse for ValidateRejection {
     fn into_response(self) -> Response {
-        // println!("ValidateRejection {:?}", self);
-        match self {
-            ValidateRejection::ValidationErrors(err) => {
-                let messages: Vec<String> = err.to_string().split("\n").map(
-                    |s| s.to_string()
-                ).collect();
-                (
-                    StatusCode::BAD_REQUEST,
-                    Json(ErrorResponse{ messages })
-                ).into_response()
-            }
-            ValidateRejection::JsonRejection(err) => (
-                (
-                    StatusCode::BAD_REQUEST,
-                    Json(ErrorResponse{ messages: vec![err.body_text();1] })
-                ).into_response()
-            ),
-        }
+        (
+            StatusCode::BAD_REQUEST,
+            Json(self.to_error_response())
+        ).into_response()
     }
 }
 
 #[derive(Debug)]
 pub struct JSONValidate<T>(pub T);
 
-
 #[async_trait]
 impl<T, S> FromRequest<S> for JSONValidate<T>
 where
     S: Send + Sync,
     T: DeserializeOwned + Validate,
-    // Json<T>: FromRequest<S, Rejection = ValidateRejection>,
-    // ValidateRejection: From<<T as FromRequest<S>>::Rejection>,
 {
     type Rejection = ValidateRejection;
 
     async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
         let Json(value) = Json::<T>::from_request(req, state).await?;
-        // value.validate().expect("TODO: panic message");
-        // println!("JSONValidatet HERE {:?}", value.validate());
         value.validate()?;
         Ok(Self(value))
     }
 }
 
-/*
-impl<T> IntoResponse for JSONValidate<T>
-where
-    T: IntoResponse,
-{
-    fn into_response(self) -> Response {
-        self.0.into_response()
-    }
-}*/

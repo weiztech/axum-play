@@ -1,5 +1,5 @@
-use serde::{Deserialize};
 use chrono::{DateTime, Utc};
+use serde::Deserialize;
 
 #[derive(Deserialize, Debug)]
 pub struct User {

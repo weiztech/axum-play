@@ -1,3 +1,4 @@
+use crate::common::extractor::ValidateRejection;
 use axum::{
     http::StatusCode,
     response::{IntoResponse, Response},
@@ -5,12 +6,11 @@ use axum::{
 use std::fmt::Debug;
 use tracing::error;
 use validator::ValidationErrors;
-use crate::common::extractor::ValidateRejection;
 
 pub enum AppError {
     UnexpectedError,
     FatalError(String),
-    DBError(tokio_postgres::Error)
+    DBError(tokio_postgres::Error),
 }
 
 impl IntoResponse for AppError {
@@ -46,10 +46,9 @@ where
     }
 }
 
-
 pub fn internal_error<E>(err: E) -> AppError
-    where
-        E: std::error::Error,
+where
+    E: std::error::Error,
 {
     AppError::UnexpectedError
 }

@@ -1,22 +1,22 @@
 extern crate core;
 
-mod users;
 mod common;
+mod users;
 
-use common::error::{AppError, InvalidPayload, internal_error};
-use common::extractor::{JSONValidate};
+use common::error::{internal_error, AppError, InvalidPayload};
+use common::extractor::JSONValidate;
 
-use std::string::String;
 use axum::body::HttpBody;
+use axum::extract::FromRequest;
 use axum::handler::Handler;
 use axum::response::IntoResponse;
 use axum::{
     async_trait,
-    debug_handler,
     body::{Body, Bytes},
+    debug_handler,
     error_handling::HandleErrorLayer,
-    extract::{DefaultBodyLimit, MatchedPath, Path, Request, State, FromRequestParts, FromRef},
-    http::{HeaderMap, HeaderName, Method, StatusCode, Uri, request::Parts},
+    extract::{DefaultBodyLimit, FromRef, FromRequestParts, MatchedPath, Path, Request, State},
+    http::{request::Parts, HeaderMap, HeaderName, Method, StatusCode, Uri},
     middleware::{self, Next},
     response::Response,
     routing::{delete, get, post, put},
@@ -27,8 +27,8 @@ use http_body_util::Full;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fmt::{Display, Pointer};
+use std::string::String;
 use std::time::Duration;
-use axum::extract::FromRequest;
 use tokio::time::sleep;
 use tower::ServiceBuilder;
 use tower_http::sensitive_headers::SetSensitiveHeadersLayer;
@@ -36,7 +36,7 @@ use tower_http::trace::{self};
 use tower_http::{
     classify::ServerErrorsFailureClass,
     classify::StatusInRangeAsFailures,
-    trace::{DefaultMakeSpan, TraceLayer, DefaultOnRequest},
+    trace::{DefaultMakeSpan, DefaultOnRequest, TraceLayer},
 };
 use tracing::error;
 use tracing::{info, Level};
@@ -54,17 +54,16 @@ use tokio_postgres::NoTls;
 struct CreateUser {
     id: u64,
     #[validate(
-    length(min = 5, message="exceed allowed min"),
-    length(max = 10, message="exceed allowed max"),
+        length(min = 5, message = "exceed allowed min"),
+        length(max = 10, message = "exceed allowed max")
     )]
     username: String,
     #[validate(
-    length(min = 3, message="exceed allowed min"),
-    length(max = 7, message="exceed allowed max"),
+        length(min = 3, message = "exceed allowed min"),
+        length(max = 7, message = "exceed allowed max")
     )]
-    address: String
+    address: String,
 }
-
 
 // the output to our `create_user` handler
 #[derive(Validate, Debug, Serialize, Deserialize)]
@@ -149,49 +148,49 @@ async fn main() {
     // let handle_logging = ServiceBuilder::new()
     //     .layer(HandleErrorLayer::new(handle_timeout_error));
 
-    let trace_layer_http = TraceLayer::new_for_http()
-        .make_span_with(|request: &Request<Body>| {
-            tracing::error_span!("\nHTTP Request ",
-                "\nUrl: {:?}\nHeaders: {:?}\n",
-                request.uri().path_and_query(),
-                request.headers()
-            )
-        });
-        /*
-        .on_request(());
-        .on_response(
-            |response: &Response<Body>, latency: Duration, _span: &Span| {
-                println!("SPAN RESP {:?}", _span);
-                let message = format!(
-                    "\nHTTP {:?} - \nHTTP Response Time: ({:?})",
-                    response, latency
-                );
-                if response.status().is_success() {
-                    tracing::info!(message);
-                } else {
-                    tracing::error!(message)
-                }
-            },
+    let trace_layer_http = TraceLayer::new_for_http().make_span_with(|request: &Request<Body>| {
+        tracing::error_span!(
+            "\nHTTP Request ",
+            "\nUrl: {:?}\nHeaders: {:?}\n",
+            request.uri().path_and_query(),
+            request.headers()
         )
-        .on_eos(
-            |trailers: Option<&HeaderMap>, stream_duration: Duration, _span: &Span| {
-                tracing::error!("stream closed after {:?}", stream_duration)
-            },
-        )
-        .on_failure(
-            |error: ServerErrorsFailureClass, latency: Duration, _span: &Span| {
-                tracing::error!("something went wrong")
-            },
-        );*/
+    });
+    /*
+    .on_request(());
+    .on_response(
+        |response: &Response<Body>, latency: Duration, _span: &Span| {
+            println!("SPAN RESP {:?}", _span);
+            let message = format!(
+                "\nHTTP {:?} - \nHTTP Response Time: ({:?})",
+                response, latency
+            );
+            if response.status().is_success() {
+                tracing::info!(message);
+            } else {
+                tracing::error!(message)
+            }
+        },
+    )
+    .on_eos(
+        |trailers: Option<&HeaderMap>, stream_duration: Duration, _span: &Span| {
+            tracing::error!("stream closed after {:?}", stream_duration)
+        },
+    )
+    .on_failure(
+        |error: ServerErrorsFailureClass, latency: Duration, _span: &Span| {
+            tracing::error!("something went wrong")
+        },
+    );*/
 
-    let manager =
-        PostgresConnectionManager::new_from_stringlike(
-            env::var("DATABASE_STRING").unwrap_or(String::from("")), NoTls
-        ).unwrap();
+    let manager = PostgresConnectionManager::new_from_stringlike(
+        env::var("DATABASE_STRING").unwrap_or(String::from("")),
+        NoTls,
+    )
+    .unwrap();
     let pool = Pool::builder().build(manager).await.unwrap();
 
-    let auth_routes = Router::new()
-        .nest("/auth", users::routes::auth_routes());
+    let auth_routes = Router::new().nest("/auth", users::routes::auth_routes());
 
     // build our application with a route
     let app = Router::new()
@@ -221,8 +220,7 @@ async fn main() {
         .with_state(pool);
 
     // run our app with hyper, listening globally on port 3000
-    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000"
-    ).await.unwrap();
+    let listener = tokio::net::TcpListener::bind("0.0.0.0:3000").await.unwrap();
     tracing::debug!("De debug 12312");
     tracing::info!("De INFO 123");
     tracing::error!("Err logg");
@@ -250,7 +248,8 @@ async fn root(DatabaseConnection(conn): DatabaseConnection) -> Result<impl IntoR
 #[debug_handler]
 async fn add_update_user(
     path: Option<Path<String>>,
-    JSONValidate(payload): JSONValidate<CreateUser>) -> impl IntoResponse {
+    JSONValidate(payload): JSONValidate<CreateUser>,
+) -> impl IntoResponse {
     println!("User id {:?} {:?}", path, payload);
     let user_id = match path {
         Some(val) => val.0.parse::<u64>().unwrap_or(0),
@@ -258,16 +257,15 @@ async fn add_update_user(
     };
     if user_id == 0 {
         // return StatusCode::BAD_REQUEST.into_response()
-        return AppError::UnexpectedError.into_response()
+        return AppError::UnexpectedError.into_response();
     }
 
     if payload.id == 1 {
-        return AppError::FatalError(
-            format!("{} {:?}", "Error Found, Please check", payload),
-        ).into_response()
+        return AppError::FatalError(format!("{} {:?}", "Error Found, Please check", payload))
+            .into_response();
         // panic!("Errr");
-    }else if payload.id == 2  {
-        return InvalidPayload(payload).into_response()
+    } else if payload.id == 2 {
+        return InvalidPayload(payload).into_response();
     }
 
     let address = format!("Address {}", payload.username);
@@ -324,17 +322,15 @@ struct DatabaseConnection(PooledConnection<'static, PostgresConnectionManager<No
 
 #[async_trait]
 impl<S> FromRequestParts<S> for DatabaseConnection
-    where
-        ConnectionPool: FromRef<S>,
-        S: Send + Sync,
+where
+    ConnectionPool: FromRef<S>,
+    S: Send + Sync,
 {
     type Rejection = AppError;
 
     async fn from_request_parts(_parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
         let pool = ConnectionPool::from_ref(state);
-        let conn = pool.get_owned().await.map_err(
-            internal_error
-        )?;
+        let conn = pool.get_owned().await.map_err(internal_error)?;
         Ok(Self(conn))
     }
 }

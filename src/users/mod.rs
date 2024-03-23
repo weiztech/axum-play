@@ -1,4 +1,4 @@
 pub mod models;
 pub mod routes;
-pub mod views;
 mod schema;
+pub mod views;
