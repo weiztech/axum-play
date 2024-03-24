@@ -7,30 +7,37 @@ use validator::{ValidationErrors, ValidationErrorsKind};
 
 #[derive(Debug, Serialize)]
 pub struct ErrorResponse {
-    pub errors: HashMap<&'static str, Cow<'static, str>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub errors: Option<HashMap<String, Cow<'static, str>>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 impl From<ValidationErrors> for ErrorResponse {
     fn from(value: ValidationErrors) -> Self {
-        let errors: HashMap<&'static str, Cow<'static, str>> = value
+        let errors: HashMap<String, Cow<'static, str>> = value
             .errors()
             .iter()
             .filter_map(|(k, v)| {
                 if let ValidationErrorsKind::Field(errors) = v {
-                    Some((*k, errors[0].message.clone().unwrap()))
+                    Some((k.to_string(), errors[0].message.clone().unwrap()))
                 } else {
                     None
                 }
             })
             .collect();
-        Self { errors }
+        Self {
+            errors: Some(errors),
+            error: None,
+        }
     }
 }
 
 impl From<JsonRejection> for ErrorResponse {
     fn from(value: JsonRejection) -> Self {
         Self {
-            errors: HashMap::from([("message", Cow::Owned(value.body_text()))]),
+            errors: None,
+            error: Some(value.body_text()),
         }
     }
 }

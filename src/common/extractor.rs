@@ -48,10 +48,7 @@ impl From<ValidationErrors> for ValidateRejection {
 
 impl IntoResponse for ValidateRejection {
     fn into_response(self) -> Response {
-        (
-            StatusCode::BAD_REQUEST,
-            Json(self.to_error_response())
-        ).into_response()
+        (StatusCode::BAD_REQUEST, Json(self.to_error_response())).into_response()
     }
 }
 
@@ -72,4 +69,3 @@ where
         Ok(Self(value))
     }
 }
-
