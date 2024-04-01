@@ -1,16 +1,19 @@
 use chrono::{DateTime, Utc};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 
-#[derive(Deserialize, Debug)]
+#[derive(Serialize, Debug)]
 pub struct User {
-    id: u64,
-    email: String,
-    image: Option<String>,
-    slug: String,
-    password: String,
-    first_name: Option<String>,
-    last_name: Option<String>,
-    create_at: DateTime<Utc>,
-    update_at: Option<DateTime<Utc>>,
-    last_login: Option<DateTime<Utc>>,
+    pub id: String,
+    pub email: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub image: Option<String>,
+    pub username: String,
+    pub first_name: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_name: Option<String>,
+    pub create_at: DateTime<Utc>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub update_at: Option<DateTime<Utc>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_login: Option<DateTime<Utc>>,
 }

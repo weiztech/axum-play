@@ -13,11 +13,6 @@ use tokio_postgres::error::{DbError, SqlState};
 use tracing::error;
 use validator::ValidationErrors;
 
-use once_cell::sync::Lazy;
-use regex::Regex;
-
-static DB_FIELD_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"Key \((.*?)\)=").expect("Invalid regex pattern"));
 
 pub enum AppError {
     UnexpectedError,
@@ -33,13 +28,8 @@ impl IntoResponse for AppError {
             AppError::DBError(error) => {
                 return match error.as_db_error() {
                     Some(err) if err.code().code() == "23505" => {
-                        let field_name =
-                            if let Some(caps) = DB_FIELD_REGEX.captures(err.detail().unwrap()) {
-                                caps.get(1).map_or("message", |m| m.as_str())
-                            } else {
-                                "message"
-                            }
-                            .to_string();
+                        let field_name = err.constraint().unwrap().split("_"
+                        ).skip(1).next().unwrap().to_string();
 
                         let errors =
                             HashMap::from([(field_name, Cow::Owned("Already exists".to_string()))]);

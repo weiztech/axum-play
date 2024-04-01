@@ -9,6 +9,38 @@ SET xmloption = content;
 SET client_min_messages = warning;
 SET row_security = off;
 
+--
+-- Name: uuid-ossp; Type: EXTENSION; Schema: -; Owner: -
+--
+
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
+
+
+--
+-- Name: EXTENSION "uuid-ossp"; Type: COMMENT; Schema: -; Owner: -
+--
+
+COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
+
+
+--
+-- Name: generate_uid(); Type: FUNCTION; Schema: public; Owner: -
+--
+
+CREATE FUNCTION public.generate_uid() RETURNS text
+    LANGUAGE plpgsql
+    AS $$
+DECLARE
+    ts_part bigint := FLOOR(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000)::bigint;
+    ts_part_hex text := TO_HEX(ts_part);
+    uuid_raw uuid := uuid_generate_v4();
+    uuid_part text := LEFT(uuid_raw::text, 8); -- This is inherently hexadecimal
+BEGIN
+RETURN ts_part_hex || '-' || uuid_part; -- Both are treated as hex; UUID is truncated
+END;
+$$;
+
+
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -27,44 +59,17 @@ CREATE TABLE public.schema_migrations (
 --
 
 CREATE TABLE public.users (
-    id integer NOT NULL,
+    id character varying(255) DEFAULT public.generate_uid() NOT NULL,
     image character varying(255),
-    slug character varying(255) NOT NULL,
+    username character varying(255) NOT NULL,
     email character varying(255) NOT NULL,
     first_name character varying(255),
     last_name character varying(255),
     password text NOT NULL,
-    create_at timestamp with time zone NOT NULL,
+    create_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
     update_at timestamp with time zone,
     last_login timestamp with time zone
 );
-
-
---
--- Name: users_id_seq; Type: SEQUENCE; Schema: public; Owner: -
---
-
-CREATE SEQUENCE public.users_id_seq
-    AS integer
-    START WITH 1
-    INCREMENT BY 1
-    NO MINVALUE
-    NO MAXVALUE
-    CACHE 1;
-
-
---
--- Name: users_id_seq; Type: SEQUENCE OWNED BY; Schema: public; Owner: -
---
-
-ALTER SEQUENCE public.users_id_seq OWNED BY public.users.id;
-
-
---
--- Name: users id; Type: DEFAULT; Schema: public; Owner: -
---
-
-ALTER TABLE ONLY public.users ALTER COLUMN id SET DEFAULT nextval('public.users_id_seq'::regclass);
 
 
 --
@@ -92,11 +97,11 @@ ALTER TABLE ONLY public.users
 
 
 --
--- Name: users users_slug_key; Type: CONSTRAINT; Schema: public; Owner: -
+-- Name: users users_username_key; Type: CONSTRAINT; Schema: public; Owner: -
 --
 
 ALTER TABLE ONLY public.users
-    ADD CONSTRAINT users_slug_key UNIQUE (slug);
+    ADD CONSTRAINT users_username_key UNIQUE (username);
 
 
 --
@@ -109,4 +114,5 @@ ALTER TABLE ONLY public.users
 --
 
 INSERT INTO public.schema_migrations (version) VALUES
-    ('20240312062744');
+    ('20240312062744'),
+    ('20240401065823');
