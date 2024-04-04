@@ -28,11 +28,26 @@ impl IntoResponse for AppError {
             AppError::DBError(error) => {
                 return match error.as_db_error() {
                     Some(err) if err.code().code() == "23505" => {
-                        let field_name = err.constraint().unwrap().split("_"
-                        ).skip(1).next().unwrap().to_string();
-
+                        let constraint = err.constraint().unwrap();
+                        let first_idx = constraint.find("_").unwrap();
+                        let last_idx = constraint.rfind("_").unwrap();
+                        let fields: Vec<&str> = constraint[first_idx + 1..last_idx].split("$$$").collect();
+                        let count_fields = fields.len();
+                        let message = match count_fields {
+                            1 => "already exists".to_string(),
+                            2 => format!("{} with {} already exists", fields[0], fields[1]),
+                            _ => {
+                                let comma_separated = fields[1..count_fields-1].join(", ");
+                                format!(
+                                    "{} with {} and {} already exists",
+                                    fields[0], comma_separated, fields[count_fields-1]
+                                )
+                            }
+                        }.replace("_", " ");
+                        let field_name = fields[0].to_string();
+                        // println!("Field name {:?} {} {}", err, field_name, message);
                         let errors =
-                            HashMap::from([(field_name, Cow::Owned("Already exists".to_string()))]);
+                            HashMap::from([(field_name, Cow::Owned(message))]);
                         Json(ErrorResponse {
                             error: None,
                             errors: Some(errors),

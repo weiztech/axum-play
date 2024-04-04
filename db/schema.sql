@@ -34,9 +34,9 @@ DECLARE
     ts_part bigint := FLOOR(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000)::bigint;
     ts_part_hex text := TO_HEX(ts_part);
     uuid_raw uuid := uuid_generate_v4();
-    uuid_part text := LEFT(uuid_raw::text, 8); -- This is inherently hexadecimal
+    uuid_part text := LEFT(uuid_raw::text, 8);
 BEGIN
-RETURN ts_part_hex || '-' || uuid_part; -- Both are treated as hex; UUID is truncated
+RETURN ts_part_hex || '-' || uuid_part;
 END;
 $$;
 
