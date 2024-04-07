@@ -13,7 +13,6 @@ use tokio_postgres::error::{DbError, SqlState};
 use tracing::error;
 use validator::ValidationErrors;
 
-
 pub enum AppError {
     UnexpectedError,
     FatalError(String),
@@ -31,19 +30,29 @@ impl IntoResponse for AppError {
                         let constraint = err.constraint().unwrap();
                         let first_idx = constraint.find("_").unwrap();
                         let last_idx = constraint.rfind("_").unwrap();
-                        let fields: Vec<&str> = constraint[first_idx + 1..last_idx].split("$$$").collect();
+                        let fields: Vec<&str> = constraint
+                            [first_idx + 1..last_idx]
+                            .split("$$$")
+                            .collect();
                         let count_fields = fields.len();
                         let message = match count_fields {
                             1 => "already exists".to_string(),
-                            2 => format!("{} with {} already exists", fields[0], fields[1]),
+                            2 => format!(
+                                "{} with {} already exists",
+                                &fields[0], &fields[1]
+                            ),
                             _ => {
-                                let comma_separated = fields[1..count_fields-1].join(", ");
+                                let comma_separated =
+                                    &fields[1..count_fields - 1].join(", ");
                                 format!(
                                     "{} with {} and {} already exists",
-                                    fields[0], comma_separated, fields[count_fields-1]
+                                    &fields[0],
+                                    comma_separated,
+                                    &fields[count_fields - 1]
                                 )
                             }
-                        }.replace("_", " ");
+                        }
+                        .replace("_", " ");
                         let field_name = fields[0].to_string();
                         // println!("Field name {:?} {} {}", err, field_name, message);
                         let errors =
@@ -62,7 +71,7 @@ impl IntoResponse for AppError {
                         error!("Unexpected - DB save error {:?}", error);
                         "Unexpected Error".into_response()
                     }
-                }
+                };
             }
         };
 

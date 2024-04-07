@@ -4,12 +4,14 @@ use tokio_postgres::types::ToSql;
 
 use crate::common::error::AppError;
 use crate::common::extractor::JSONValidate;
+use crate::db::extractors::DatabaseConnection;
 use crate::users::models::User;
 use crate::users::schema::{UserPasswordLogin, UserRegisterPassword};
-use crate::DatabaseConnection;
 
 #[debug_handler]
-pub async fn password_login(Json(payload): Json<UserPasswordLogin>) -> impl IntoResponse {
+pub async fn password_login(
+    Json(payload): Json<UserPasswordLogin>,
+) -> impl IntoResponse {
     println!("Payload {:?}", payload);
     "OK"
 }
@@ -20,7 +22,8 @@ pub async fn user_register(
     JSONValidate(payload): JSONValidate<UserRegisterPassword>,
 ) -> Result<impl IntoResponse, AppError> {
     let now = Utc::now();
-    let username = payload.first_name.to_string() + now.timestamp().to_string().as_str();
+    let username =
+        payload.first_name.to_string() + now.timestamp().to_string().as_str();
     let query = "INSERT INTO users (\
     email, username, first_name, last_name, password, create_at) \
     VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, create_at";

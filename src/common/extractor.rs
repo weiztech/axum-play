@@ -28,7 +28,9 @@ pub enum ValidateRejection {
 impl ValidateRejection {
     fn to_error_response(self) -> ErrorResponse {
         match self {
-            ValidateRejection::ValidationErrors(err) => ErrorResponse::from(err),
+            ValidateRejection::ValidationErrors(err) => {
+                ErrorResponse::from(err)
+            }
             ValidateRejection::JsonRejection(err) => ErrorResponse::from(err),
         }
     }
@@ -48,7 +50,8 @@ impl From<ValidationErrors> for ValidateRejection {
 
 impl IntoResponse for ValidateRejection {
     fn into_response(self) -> Response {
-        (StatusCode::BAD_REQUEST, Json(self.to_error_response())).into_response()
+        (StatusCode::BAD_REQUEST, Json(self.to_error_response()))
+            .into_response()
     }
 }
 
@@ -63,7 +66,10 @@ where
 {
     type Rejection = ValidateRejection;
 
-    async fn from_request(req: Request, state: &S) -> Result<Self, Self::Rejection> {
+    async fn from_request(
+        req: Request,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
         let Json(value) = Json::<T>::from_request(req, state).await?;
         value.validate()?;
         Ok(Self(value))

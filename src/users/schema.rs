@@ -6,7 +6,8 @@ use validator::Validate;
 use once_cell::sync::Lazy;
 use regex::Regex;
 
-static EMAIL_SUFFIX: Lazy<Regex> = Lazy::new(|| Regex::new(r"\.[a-zA-Z]{2,}$").unwrap());
+static EMAIL_SUFFIX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"\.[a-zA-Z]{2,}$").unwrap());
 
 #[derive(Deserialize, Debug)]
 pub(crate) struct UserProfile {
@@ -34,7 +35,10 @@ pub(crate) struct UserRegisterPassword {
     pub email: String,
     #[validate(
         length(min = 5, max = 254, message = "invalid field length"),
-        must_match(other = "new_password", message = "not match with new password")
+        must_match(
+            other = "new_password",
+            message = "not match with new password"
+        )
     )]
     pub password: String,
     #[validate(length(min = 5, max = 254, message = "invalid field length"))]

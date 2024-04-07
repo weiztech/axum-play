@@ -1,10 +1,10 @@
-extern crate core;
-
 mod common;
+mod db;
 mod users;
 
 use common::error::{internal_error, AppError, InvalidPayload};
 use common::extractor::JSONValidate;
+use db::extractors::{ConnectionPool, DatabaseConnection};
 
 use axum::body::HttpBody;
 use axum::extract::FromRequest;
@@ -15,7 +15,10 @@ use axum::{
     body::{Body, Bytes},
     debug_handler,
     error_handling::HandleErrorLayer,
-    extract::{DefaultBodyLimit, FromRef, FromRequestParts, MatchedPath, Path, Request, State},
+    extract::{
+        DefaultBodyLimit, FromRef, FromRequestParts, MatchedPath, Path,
+        Request, State,
+    },
     http::{request::Parts, HeaderMap, HeaderName, Method, StatusCode, Uri},
     middleware::{self, Next},
     response::Response,
@@ -45,7 +48,7 @@ use tracing_subscriber::fmt::layer;
 use tracing_subscriber::{fmt, layer::SubscriberExt, util::SubscriberInitExt};
 use validator::Validate;
 
-use bb8::{Pool, PooledConnection};
+use bb8::Pool;
 use bb8_postgres::PostgresConnectionManager;
 use tokio_postgres::NoTls;
 
@@ -101,7 +104,9 @@ async fn new_middleware(request: Request, next: Next) -> Response {
     let bytes = body
         .collect()
         .await
-        .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response())
+        .map_err(|err| {
+            (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response()
+        })
         .unwrap()
         .to_bytes();
 
@@ -148,14 +153,15 @@ async fn main() {
     // let handle_logging = ServiceBuilder::new()
     //     .layer(HandleErrorLayer::new(handle_timeout_error));
 
-    let trace_layer_http = TraceLayer::new_for_http().make_span_with(|request: &Request<Body>| {
-        tracing::error_span!(
-            "\nHTTP Request ",
-            "\nUrl: {:?}\nHeaders: {:?}\n",
-            request.uri().path_and_query(),
-            request.headers()
-        )
-    });
+    let trace_layer_http =
+        TraceLayer::new_for_http().make_span_with(|request: &Request<Body>| {
+            tracing::error_span!(
+                "\nHTTP Request ",
+                "\nUrl: {:?}\nHeaders: {:?}\n",
+                request.uri().path_and_query(),
+                request.headers()
+            )
+        });
     /*
     .on_request(());
     .on_response(
@@ -227,14 +233,13 @@ async fn main() {
     axum::serve(listener, app).await.unwrap();
 }
 
-type ConnectionPool = Pool<PostgresConnectionManager<NoTls>>;
-
 // basic handler that responds with a static string
 
 #[debug_handler(state=ConnectionPool)]
-async fn root(DatabaseConnection(conn): DatabaseConnection) -> Result<impl IntoResponse, AppError> {
+async fn root(
+    DatabaseConnection(conn): DatabaseConnection,
+) -> Result<impl IntoResponse, AppError> {
     // let conn = pool.get().await.map_err(internal_error)?;
-    println!("Conn {:?}", conn);
     let row = conn
         .query_one("select 1 + 1", &[])
         .await
@@ -261,8 +266,11 @@ async fn add_update_user(
     }
 
     if payload.id == 1 {
-        return AppError::FatalError(format!("{} {:?}", "Error Found, Please check", payload))
-            .into_response();
+        return AppError::FatalError(format!(
+            "{} {:?}",
+            "Error Found, Please check", payload
+        ))
+        .into_response();
         // panic!("Errr");
     } else if payload.id == 2 {
         return InvalidPayload(payload).into_response();
@@ -316,21 +324,4 @@ async fn delete_user(Path(user_id): Path<String>) -> StatusCode {
         return StatusCode::NO_CONTENT;
     }
     StatusCode::OK
-}
-
-struct DatabaseConnection(PooledConnection<'static, PostgresConnectionManager<NoTls>>);
-
-#[async_trait]
-impl<S> FromRequestParts<S> for DatabaseConnection
-where
-    ConnectionPool: FromRef<S>,
-    S: Send + Sync,
-{
-    type Rejection = AppError;
-
-    async fn from_request_parts(_parts: &mut Parts, state: &S) -> Result<Self, Self::Rejection> {
-        let pool = ConnectionPool::from_ref(state);
-        let conn = pool.get_owned().await.map_err(internal_error)?;
-        Ok(Self(conn))
-    }
 }
