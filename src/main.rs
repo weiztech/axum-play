@@ -2,7 +2,7 @@ mod common;
 mod db;
 mod users;
 
-use common::error::{internal_error, AppError, InvalidPayload};
+use common::error::{internal_error, AppError};
 use common::extractor::JSONValidate;
 use db::extractors::{ConnectionPool, DatabaseConnection};
 
@@ -273,7 +273,7 @@ async fn add_update_user(
         .into_response();
         // panic!("Errr");
     } else if payload.id == 2 {
-        return InvalidPayload(payload).into_response();
+        return AppError::FatalError("invalid id".to_string()).into_response();
     }
 
     let address = format!("Address {}", payload.username);

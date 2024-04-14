@@ -1,4 +1,7 @@
 use axum::extract::rejection::JsonRejection;
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
+use axum::Json;
 use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -39,5 +42,11 @@ impl From<JsonRejection> for ErrorResponse {
             errors: None,
             error: Some(value.body_text()),
         }
+    }
+}
+
+impl IntoResponse for ErrorResponse {
+    fn into_response(self) -> Response {
+        (StatusCode::BAD_REQUEST, Json(self)).into_response()
     }
 }

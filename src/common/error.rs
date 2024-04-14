@@ -17,13 +17,20 @@ pub enum AppError {
     UnexpectedError,
     FatalError(String),
     DBError(tokio_postgres::Error),
+    ValidationErrors(ValidationErrors),
 }
 
 impl IntoResponse for AppError {
     fn into_response(self) -> Response {
-        let body = match self {
-            AppError::UnexpectedError => "something went wrong".to_string(),
-            AppError::FatalError(string) => string,
+        return match self {
+            AppError::UnexpectedError => (
+                StatusCode::INTERNAL_SERVER_ERROR,
+                "something went wrong".to_string(),
+            )
+                .into_response(),
+            AppError::FatalError(string) => {
+                (StatusCode::INTERNAL_SERVER_ERROR, string).into_response()
+            }
             AppError::DBError(error) => {
                 return match error.as_db_error() {
                     Some(err) if err.code().code() == "23505" => {
@@ -57,25 +64,30 @@ impl IntoResponse for AppError {
                         // println!("Field name {:?} {} {}", err, field_name, message);
                         let errors =
                             HashMap::from([(field_name, Cow::Owned(message))]);
-                        Json(ErrorResponse {
-                            error: None,
-                            errors: Some(errors),
-                        })
-                        .into_response()
+                        (
+                            StatusCode::BAD_REQUEST,
+                            Json(ErrorResponse {
+                                error: None,
+                                errors: Some(errors),
+                            }),
+                        )
+                            .into_response()
                     }
                     Some(err) => {
                         error!("Unexpected - DB save error code {:?}", err);
-                        "Unexpected save error".into_response()
+                        (StatusCode::BAD_REQUEST, "data save error")
+                            .into_response()
                     }
                     _ => {
                         error!("Unexpected - DB save error {:?}", error);
-                        "Unexpected Error".into_response()
+                        (StatusCode::BAD_REQUEST, "Failed save").into_response()
                     }
                 };
             }
+            AppError::ValidationErrors(err) => {
+                ErrorResponse::from(err).into_response()
+            }
         };
-
-        (StatusCode::INTERNAL_SERVER_ERROR, body).into_response()
     }
 }
 
@@ -85,15 +97,9 @@ impl From<tokio_postgres::Error> for AppError {
     }
 }
 
-pub struct InvalidPayload<T>(pub T);
-
-impl<T> IntoResponse for InvalidPayload<T>
-where
-    T: Debug,
-{
-    fn into_response(self) -> Response {
-        error!("\nPAYLOAD ERROR: {:?}", self.0);
-        (StatusCode::BAD_REQUEST, "Invalid Payload").into_response()
+impl From<ValidationErrors> for AppError {
+    fn from(value: ValidationErrors) -> Self {
+        Self::ValidationErrors(value)
     }
 }
 

@@ -3,11 +3,7 @@ use core::fmt::Debug;
 use serde::Deserialize;
 use validator::Validate;
 
-use once_cell::sync::Lazy;
-use regex::Regex;
-
-static EMAIL_SUFFIX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"\.[a-zA-Z]{2,}$").unwrap());
+use crate::users::models::{ToUser, User};
 
 #[derive(Deserialize, Debug)]
 pub(crate) struct UserProfile {
@@ -22,16 +18,9 @@ pub(crate) struct UserPasswordLogin {
 }
 
 #[derive(Debug, Validate, Deserialize)]
-pub(crate) struct UserRegisterPassword {
-    #[validate(length(min = 3, max = 254, message = "invalid field length"))]
+pub(crate) struct RegisterEmail {
     pub first_name: String,
-    #[validate(length(min = 3, max = 254, message = "invalid field length"))]
     pub last_name: Option<String>,
-    #[validate(
-        email(message = "invalid email"),
-        length(min = 5, max = 254, message = "invalid field length"),
-        regex(path = "EMAIL_SUFFIX", message = "invalid email format")
-    )]
     pub email: String,
     #[validate(
         length(min = 5, max = 254, message = "invalid field length"),
@@ -43,6 +32,23 @@ pub(crate) struct UserRegisterPassword {
     pub password: String,
     #[validate(length(min = 5, max = 254, message = "invalid field length"))]
     new_password: String,
+}
+
+impl ToUser for RegisterEmail {
+    fn to_user(self) -> Result<User, String> {
+        Ok(User {
+            id: None,
+            email: self.email,
+            image: None,
+            first_name: Some(self.first_name),
+            last_name: self.last_name,
+            password: Some(self.password),
+            update_at: None,
+            last_login: None,
+            create_at: None,
+            username: None,
+        })
+    }
 }
 
 #[derive(Debug, Deserialize)]

@@ -11,9 +11,10 @@ use crate::common::error::{internal_error, AppError};
 
 pub type ConnectionPool = Pool<PostgresConnectionManager<NoTls>>;
 
-pub struct DatabaseConnection(
-    pub PooledConnection<'static, PostgresConnectionManager<NoTls>>,
-);
+pub type ConnectionPooled =
+    PooledConnection<'static, PostgresConnectionManager<NoTls>>;
+
+pub struct DatabaseConnection(pub ConnectionPooled);
 
 #[async_trait]
 impl<S> FromRequestParts<S> for DatabaseConnection
