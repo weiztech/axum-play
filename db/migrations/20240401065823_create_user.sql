@@ -1,6 +1,6 @@
 -- migrate:up
 create table users (
-    id VARCHAR(255) NOT NULL DEFAULT generate_uid() PRIMARY KEY,
+    id VARCHAR(255) NOT NULL PRIMARY KEY,
     image varchar(255),
     username varchar(255) unique not null,
     email varchar(255) unique not null,

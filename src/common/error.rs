@@ -13,6 +13,8 @@ use tokio_postgres::error::{DbError, SqlState};
 use tracing::error;
 use validator::ValidationErrors;
 
+pub type Result<T> = core::result::Result<T, AppError>;
+
 pub enum AppError {
     UnexpectedError,
     FatalError(String),

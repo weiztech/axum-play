@@ -1,15 +1,17 @@
 use chrono::Utc;
 use std::fmt::Debug;
 use validator::Validate;
+use uuid::Uuid;
+use base62;
 
-use crate::common::error::AppError;
+use crate::common::error::{Result};
 use crate::db::extractors::ConnectionPooled;
 use crate::users::models::{ToUser, User};
 
 pub async fn create_user<T>(
     con: ConnectionPooled,
     user_data: T,
-) -> Result<User, AppError>
+) -> Result<User>
 where
     T: ToUser + Debug,
 {
@@ -19,18 +21,20 @@ where
     let now = Utc::now();
     if user.first_name.is_some() {
         user.username = Some(
-            user.first_name.as_ref().unwrap().to_string()
+            user.first_name.as_ref().unwrap().to_string().to_lowercase()
                 + now.timestamp().to_string().as_str(),
         );
     }
 
+    let user_id = base62::encode(Uuid::now_v7().as_u128());
     let query = "INSERT INTO users (\
-    email, username, first_name, last_name, password) \
-    VALUES ($1, $2, $3, $4, $5) RETURNING id, create_at";
+    id, email, username, first_name, last_name, password) \
+    VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, create_at";
     let user_row = con
         .query_one(
             query,
             &[
+                &user_id,
                 &user.email,
                 &user.username.as_ref().unwrap(),
                 &user.first_name.as_ref().unwrap(),

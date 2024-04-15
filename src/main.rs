@@ -8,7 +8,6 @@ use db::extractors::{ConnectionPool, DatabaseConnection};
 
 use axum::body::HttpBody;
 use axum::extract::FromRequest;
-use axum::handler::Handler;
 use axum::response::IntoResponse;
 use axum::{
     async_trait,
@@ -25,8 +24,6 @@ use axum::{
     routing::{delete, get, post, put},
     BoxError, Json, RequestPartsExt, Router,
 };
-use http_body_util::BodyExt;
-use http_body_util::Full;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fmt::{Display, Pointer};
@@ -96,33 +93,6 @@ async fn my_middleware(request: Request, next: Next) -> Response {
     response
 }
 
-async fn new_middleware(request: Request, next: Next) -> Response {
-    let (parts, body) = request.into_parts();
-    let p_parts = format!("{:?}", parts);
-
-    // this wont work if the body is an long running stream
-    let bytes = body
-        .collect()
-        .await
-        .map_err(|err| {
-            (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()).into_response()
-        })
-        .unwrap()
-        .to_bytes();
-
-    let response = next
-        .run(Request::from_parts(parts, Body::from(bytes.clone())))
-        .await;
-    let status_code = response.status();
-    if status_code != StatusCode::OK && status_code != StatusCode::CREATED {
-        error!(
-            "\nStatus {}\nRequest: {:?}\nBody: {:?}",
-            status_code, p_parts, &bytes
-        );
-    }
-    info!("Response new Middleware {:?}", response);
-    response
-}
 
 async fn handle_timeout_error(
     // `Method` and `Uri` are extractors so they can be used here

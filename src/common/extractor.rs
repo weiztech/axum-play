@@ -2,7 +2,6 @@ use crate::common::response::ErrorResponse;
 use axum::async_trait;
 use axum::extract::rejection::JsonRejection;
 use axum::extract::{FromRequest, Json, Request};
-use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;

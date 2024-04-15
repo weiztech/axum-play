@@ -23,24 +23,6 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp" WITH SCHEMA public;
 COMMENT ON EXTENSION "uuid-ossp" IS 'generate universally unique identifiers (UUIDs)';
 
 
---
--- Name: generate_uid(); Type: FUNCTION; Schema: public; Owner: -
---
-
-CREATE FUNCTION public.generate_uid() RETURNS text
-    LANGUAGE plpgsql
-    AS $$
-DECLARE
-    ts_part bigint := FLOOR(EXTRACT(EPOCH FROM CURRENT_TIMESTAMP) * 1000)::bigint;
-    ts_part_hex text := TO_HEX(ts_part);
-    uuid_raw uuid := uuid_generate_v4();
-    uuid_part text := LEFT(uuid_raw::text, 8);
-BEGIN
-RETURN ts_part_hex || '-' || uuid_part;
-END;
-$$;
-
-
 SET default_tablespace = '';
 
 SET default_table_access_method = heap;
@@ -59,7 +41,7 @@ CREATE TABLE public.schema_migrations (
 --
 
 CREATE TABLE public.users (
-    id character varying(255) DEFAULT public.generate_uid() NOT NULL,
+    id character varying(255) NOT NULL,
     image character varying(255),
     username character varying(255) NOT NULL,
     email character varying(255) NOT NULL,
@@ -114,5 +96,4 @@ ALTER TABLE ONLY public.users
 --
 
 INSERT INTO public.schema_migrations (version) VALUES
-    ('20240312062744'),
     ('20240401065823');
