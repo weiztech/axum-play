@@ -1,6 +1,6 @@
 use axum::{debug_handler, response::IntoResponse, Json};
 
-use crate::common::error::{Result};
+use crate::common::error::Result;
 use crate::common::extractor::JSONValidate;
 use crate::db::extractors::{ConnectionPool, DatabaseConnection};
 use crate::users::db::create_user;

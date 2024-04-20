@@ -93,7 +93,6 @@ async fn my_middleware(request: Request, next: Next) -> Response {
     response
 }
 
-
 async fn handle_timeout_error(
     // `Method` and `Uri` are extractors so they can be used here
     method: Method,
