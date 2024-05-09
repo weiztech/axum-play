@@ -7,7 +7,9 @@ create table users (
     first_name varchar(255),
     last_name varchar(255),
     password text not null,
+    is_active BOOLEAN DEFAULT FALSE,
     create_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP not null,
+    active_at timestamp with time zone,
     update_at timestamp with time zone,
     last_login timestamp with time zone
 );

@@ -19,7 +19,7 @@ pub(crate) struct UserPasswordLogin {
 
 #[derive(Debug, Validate, Deserialize)]
 pub(crate) struct RegisterEmail {
-    pub first_name: String,
+    pub first_name: Option<String>,
     pub last_name: Option<String>,
     pub email: String,
     #[validate(
@@ -32,23 +32,6 @@ pub(crate) struct RegisterEmail {
     pub password: String,
     #[validate(length(min = 5, max = 254, message = "invalid field length"))]
     new_password: String,
-}
-
-impl ToUser for RegisterEmail {
-    fn to_user(self) -> Result<User, String> {
-        Ok(User {
-            id: None,
-            email: self.email,
-            image: None,
-            first_name: Some(self.first_name),
-            last_name: self.last_name,
-            password: Some(self.password),
-            update_at: None,
-            last_login: None,
-            create_at: None,
-            username: None,
-        })
-    }
 }
 
 #[derive(Debug, Deserialize)]

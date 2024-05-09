@@ -48,7 +48,9 @@ CREATE TABLE public.users (
     first_name character varying(255),
     last_name character varying(255),
     password text NOT NULL,
+    is_active boolean DEFAULT false,
     create_at timestamp with time zone DEFAULT CURRENT_TIMESTAMP NOT NULL,
+    active_at timestamp with time zone,
     update_at timestamp with time zone,
     last_login timestamp with time zone
 );

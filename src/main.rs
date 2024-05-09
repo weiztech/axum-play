@@ -34,6 +34,7 @@ use tower::ServiceBuilder;
 use tower_http::sensitive_headers::SetSensitiveHeadersLayer;
 use tower_http::trace::{self};
 use tower_http::{
+    catch_panic::CatchPanicLayer,
     classify::ServerErrorsFailureClass,
     classify::StatusInRangeAsFailures,
     trace::{DefaultMakeSpan, DefaultOnRequest, TraceLayer},
@@ -50,7 +51,7 @@ use bb8_postgres::PostgresConnectionManager;
 use tokio_postgres::NoTls;
 
 // the input to our `create_user` handler
-#[derive(Deserialize, Debug, Clone, Validate)]
+#[derive(Deserialize, Debug, Validate)]
 struct CreateUser {
     id: u64,
     #[validate(
@@ -190,6 +191,7 @@ async fn main() {
                     HeaderName::from_static("user-agent"),
                     HeaderName::from_static("postman-token"),
                 ]))
+                .layer(CatchPanicLayer::new())
                 .layer(trace_layer_http),
         )
         .with_state(pool);
@@ -215,6 +217,7 @@ async fn root(
         .map_err(internal_error)?;
     let two: i32 = row.try_get(0).map_err(internal_error)?;
     println!("Value {:?} {}", row, two);
+    // panic!("hello world");
     // sleep(Duration::from_secs(2)).await;
     Ok((StatusCode::OK, String::from("Hello World")))
 }
@@ -222,7 +225,8 @@ async fn root(
 #[debug_handler]
 async fn add_update_user(
     path: Option<Path<String>>,
-    JSONValidate(payload): JSONValidate<CreateUser>,
+    //JSONValidate(payload): JSONValidate<CreateUser>,
+    Json(payload): Json<CreateUser>,
 ) -> impl IntoResponse {
     println!("User id {:?} {:?}", path, payload);
     let user_id = match path {

@@ -1,10 +1,18 @@
 use base62;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use std::env;
 use uuid::Uuid;
 
 pub static EMAIL_SUFFIX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"\.[a-zA-Z]{2,}$").unwrap());
+
+pub static PASSWORD_ITERATION: Lazy<u32> = Lazy::new(|| {
+    env::var("PASSWORD_ITERATION")
+        .unwrap_or_else(|_| "10000".to_string())
+        .parse::<u32>()
+        .unwrap()
+});
 
 pub fn uuid7_b62() -> String {
     base62::encode(Uuid::now_v7().as_u128())
