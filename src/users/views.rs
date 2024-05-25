@@ -21,8 +21,8 @@ pub async fn user_register(
 ) -> Result<impl IntoResponse> {
     let user: User = create_user(
         conn,
-        &payload.email,
-        Some(payload.password.as_str()),
+        payload.email.as_deref().unwrap(),
+        Some(payload.password.as_deref().unwrap()),
         payload.first_name.as_deref(),
         payload.last_name.as_deref(),
     )

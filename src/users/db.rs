@@ -1,26 +1,15 @@
 use chrono::Utc;
-use once_cell::sync::Lazy;
 use std::borrow::Cow;
-use std::env;
 use std::fmt::Debug;
 use std::string::ToString;
-use uuid::Uuid;
-use validator::Validate;
 
 use crate::common::error::{AppError, Result};
+use crate::common::response::ErrorResponse;
 use crate::common::utils::{
-    uuid7_b62,
-    Password::{generate_password_hash, is_valid},
+    uuid7_b62, Password::generate_password_hash, PASSWORD_ITERATION,
 };
 use crate::db::extractors::ConnectionPooled;
-use crate::users::models::{ToUser, User};
-
-pub static PASSWORD_ITERATION: Lazy<u32> = Lazy::new(|| {
-    env::var("PASSWORD_ITERATION")
-        .unwrap_or_else(|_| "10000".to_string())
-        .parse::<u32>()
-        .unwrap()
-});
+use crate::users::models::User;
 
 pub async fn create_user<'a>(
     con: ConnectionPooled,
@@ -29,6 +18,21 @@ pub async fn create_user<'a>(
     first_name: Option<&'a str>,
     last_name: Option<&'a str>,
 ) -> Result<User<'a>> {
+    let user_created: bool = con
+        .query_one(
+            "SELECT EXISTS (SELECT id FROM users WHERE email = $1)",
+            &[&email],
+        )
+        .await
+        .map_err(|_| AppError::FatalError("Unable to create user".to_string()))?
+        .get(0);
+
+    if (user_created) {
+        return Err(AppError::from(ErrorResponse::create_error(
+            "Email already exists",
+        )));
+    }
+
     let now = Utc::now();
     let user_id = uuid7_b62();
 
@@ -39,7 +43,7 @@ pub async fn create_user<'a>(
     };
 
     let username = first_name.unwrap_or_else(|| email_prefix).to_lowercase()
-        + &user_id[user_id.len() - 5..];
+        + &user_id[user_id.len() - 9..];
 
     let user_password_hash = match password {
         Some(password) => generate_password_hash(
@@ -64,7 +68,6 @@ pub async fn create_user<'a>(
         update_at: None,
         last_login: None,
     };
-    user.validate()?;
 
     let query = "INSERT INTO users (\
     id, email, username, first_name, last_name, password) \

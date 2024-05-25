@@ -8,7 +8,6 @@ use axum::{
 use std::borrow::Cow;
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::ptr::null;
 use tokio_postgres::error::{DbError, SqlState};
 use tracing::error;
 use validator::ValidationErrors;
@@ -20,6 +19,7 @@ pub enum AppError {
     FatalError(String),
     DBError(tokio_postgres::Error),
     ValidationErrors(ValidationErrors),
+    ErrorResponse(ErrorResponse),
 }
 
 impl IntoResponse for AppError {
@@ -89,6 +89,7 @@ impl IntoResponse for AppError {
             AppError::ValidationErrors(err) => {
                 ErrorResponse::from(err).into_response()
             }
+            AppError::ErrorResponse(err) => err.into_response(),
         };
     }
 }
@@ -102,6 +103,12 @@ impl From<tokio_postgres::Error> for AppError {
 impl From<ValidationErrors> for AppError {
     fn from(value: ValidationErrors) -> Self {
         Self::ValidationErrors(value)
+    }
+}
+
+impl From<ErrorResponse> for AppError {
+    fn from(value: ErrorResponse) -> Self {
+        Self::ErrorResponse(value)
     }
 }
 

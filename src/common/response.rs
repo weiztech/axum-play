@@ -5,15 +5,28 @@ use axum::Json;
 use serde::Serialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
+
 use std::fmt::Debug;
+use std::string::String;
 use validator::{ValidationErrors, ValidationErrorsKind};
+
+static JSON_REJECTION_MESSAGE: &str = "Invalid json format";
 
 #[derive(Debug, Serialize)]
 pub struct ErrorResponse {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub errors: Option<HashMap<String, Cow<'static, str>>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
+    pub error: Option<Cow<'static, str>>,
+}
+
+impl ErrorResponse {
+    pub fn create_error(error_message: &'static str) -> Self {
+        Self {
+            errors: None,
+            error: Some(Cow::Borrowed(error_message)),
+        }
+    }
 }
 
 impl From<ValidationErrors> for ErrorResponse {
@@ -40,7 +53,7 @@ impl From<JsonRejection> for ErrorResponse {
     fn from(value: JsonRejection) -> Self {
         Self {
             errors: None,
-            error: Some(value.body_text()),
+            error: Some(Cow::Borrowed(JSON_REJECTION_MESSAGE)),
         }
     }
 }
