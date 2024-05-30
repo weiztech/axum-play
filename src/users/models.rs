@@ -1,5 +1,5 @@
 use chrono::{DateTime, Utc};
-use serde::{Serialize};
+use serde::Serialize;
 use std::borrow::Cow;
 
 use crate::common::utils::{
@@ -14,8 +14,8 @@ pub struct User<'a> {
     pub image: Option<&'a str>,
     // #[serde(skip_serializing)]
     // pub password: Option<&'a str>,
-    // #[serde(skip_serializing)]
-    // pub is_active: Option<&'a bool>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub is_active: Option<bool>,
     // username value should be generated
     pub username: Option<Cow<'a, str>>,
     pub first_name: Option<&'a str>,

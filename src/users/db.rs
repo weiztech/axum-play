@@ -20,14 +20,14 @@ pub async fn create_user<'a>(
 ) -> Result<User<'a>> {
     let user_created: bool = con
         .query_one(
-            "SELECT EXISTS (SELECT id FROM users WHERE email = $1)",
+            "SELECT EXISTS (SELECT 1 FROM users WHERE email = $1)",
             &[&email],
         )
         .await
         .map_err(|_| AppError::FatalError("Unable to create user".to_string()))?
         .get(0);
 
-    if (user_created) {
+    if user_created {
         return Err(AppError::from(ErrorResponse::create_error(
             "Email already exists",
         )));
@@ -65,6 +65,7 @@ pub async fn create_user<'a>(
         first_name: Some(user_first_name),
         last_name,
         create_at: Some(now),
+        is_active: None,
         update_at: None,
         last_login: None,
     };

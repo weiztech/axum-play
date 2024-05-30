@@ -2,15 +2,27 @@ use axum::extract::rejection::JsonRejection;
 use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use axum::Json;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use std::borrow::Cow;
 use std::collections::HashMap;
 
 use std::fmt::Debug;
 use std::string::String;
-use validator::{ValidationErrors, ValidationErrorsKind};
+use validator::{Validate, ValidationErrors, ValidationErrorsKind};
 
 static JSON_REJECTION_MESSAGE: &str = "Invalid json format";
+
+#[derive(Debug, Deserialize, Serialize, Validate)]
+pub struct PaginationOptions {
+    previous: Option<String>,
+    #[validate(range(min = 1, max = 25, message = "invalid range value"))]
+    limit: Option<u32>,
+}
+
+pub struct ListResponse<T> {
+    items: Vec<T>,
+    pagination: PaginationOptions,
+}
 
 #[derive(Debug, Serialize)]
 pub struct ErrorResponse {
@@ -50,7 +62,7 @@ impl From<ValidationErrors> for ErrorResponse {
 }
 
 impl From<JsonRejection> for ErrorResponse {
-    fn from(value: JsonRejection) -> Self {
+    fn from(_: JsonRejection) -> Self {
         Self {
             errors: None,
             error: Some(Cow::Borrowed(JSON_REJECTION_MESSAGE)),

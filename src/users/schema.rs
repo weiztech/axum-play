@@ -1,6 +1,7 @@
+use chrono::{DateTime, Utc};
 use core::fmt::Debug;
 
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use validator::Validate;
 
 use crate::common::utils::EMAIL_SUFFIX;
@@ -56,4 +57,14 @@ pub(crate) struct EmailChange {
     email: String,
     password: String,
     new_password: String,
+}
+
+#[derive(Debug, Deserialize, Validate, Serialize)]
+pub struct UserQuery {
+    #[validate(length(min = 3, max = 100, message = "invalid field length"))]
+    pub email: Option<String>,
+    pub is_active: Option<bool>,
+    #[validate(length(min = 3, max = 50, message = "invalid field length"))]
+    pub name: Option<String>,
+    pub create_at: Option<DateTime<Utc>>,
 }

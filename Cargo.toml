@@ -20,7 +20,7 @@ version = "0.12.2"
 features = ["simple"]
 
 [dependencies.axum]
-version = "0.7.1"
+version = "0.7.5"
 features = ["macros"]
 
 [dependencies.tracing-subscriber]

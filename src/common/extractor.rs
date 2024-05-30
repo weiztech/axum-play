@@ -1,7 +1,8 @@
 use crate::common::response::ErrorResponse;
 use axum::async_trait;
-use axum::extract::rejection::JsonRejection;
-use axum::extract::{FromRequest, Json, Request};
+use axum::extract::rejection::{JsonRejection, QueryRejection};
+use axum::extract::{FromRequest, FromRequestParts, Json, Query, Request};
+use axum::http::request::Parts;
 use axum::response::{IntoResponse, Response};
 use serde::de::DeserializeOwned;
 use std::fmt::Debug;
@@ -21,6 +22,7 @@ impl<T: Debug + Validate> ValidateValue for Json<T> {
 #[derive(Debug)]
 pub enum ValidateRejection {
     JsonRejection(JsonRejection),
+    QueryRejection(QueryRejection),
     ValidationErrors(ValidationErrors),
 }
 
@@ -36,10 +38,19 @@ impl From<ValidationErrors> for ValidateRejection {
     }
 }
 
+impl From<QueryRejection> for ValidateRejection {
+    fn from(value: QueryRejection) -> Self {
+        Self::QueryRejection(value)
+    }
+}
+
 impl IntoResponse for ValidateRejection {
     fn into_response(self) -> Response {
         let error_response = match self {
             ValidateRejection::JsonRejection(err) => ErrorResponse::from(err),
+            ValidateRejection::QueryRejection(err) => {
+                ErrorResponse::create_error("Invalid query params format")
+            }
             ValidateRejection::ValidationErrors(err) => {
                 ErrorResponse::from(err)
             }
@@ -66,5 +77,26 @@ where
         let Json(value) = Json::<T>::from_request(req, state).await?;
         value.validate()?;
         Ok(Self(value))
+    }
+}
+
+#[derive(Debug)]
+pub struct QueryValidate<T>(pub T);
+
+#[async_trait]
+impl<T, S> FromRequestParts<S> for QueryValidate<T>
+where
+    T: DeserializeOwned + Validate,
+    S: Send + Sync,
+{
+    type Rejection = ValidateRejection;
+
+    async fn from_request_parts(
+        parts: &mut Parts,
+        state: &S,
+    ) -> Result<Self, Self::Rejection> {
+        let Query(query) = Query::<T>::from_request_parts(parts, state).await?;
+        query.validate()?;
+        Ok(Self(query))
     }
 }

@@ -166,13 +166,14 @@ async fn main() {
     .unwrap();
     let pool = Pool::builder().build(manager).await.unwrap();
 
-    let auth_routes = Router::new().nest("/auth", users::routes::auth_routes());
+    let auth_routes =
+        Router::new().nest("/users", users::routes::auth_routes());
 
     // build our application with a route
     let app = Router::new()
         // `GET /` goes to `root`
         .route("/", get(root))
-        .nest("/", auth_routes)
+        .nest("/api", auth_routes)
         // `POST /users` goes to `create_user`
         .route("/users", post(add_update_user))
         .route("/users/:user_id", get(get_user))
