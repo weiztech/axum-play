@@ -12,16 +12,26 @@ use validator::{Validate, ValidationErrors, ValidationErrorsKind};
 
 static JSON_REJECTION_MESSAGE: &str = "Invalid json format";
 
-#[derive(Debug, Deserialize, Serialize, Validate)]
+#[derive(Debug, Deserialize, Serialize, Validate, Clone)]
 pub struct PaginationOptions {
-    previous: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub next_previous: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub previous: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     #[validate(range(min = 1, max = 25, message = "invalid range value"))]
-    limit: Option<u32>,
+    #[serde(default = "default_pagination_limit")]
+    pub limit: Option<u32>,
 }
 
+fn default_pagination_limit() -> Option<u32> {
+    Some(10)
+}
+
+#[derive(Debug, Serialize)]
 pub struct ListResponse<T> {
-    items: Vec<T>,
-    pagination: PaginationOptions,
+    pub items: Vec<T>,
+    pub pagination: PaginationOptions,
 }
 
 #[derive(Debug, Serialize)]

@@ -4,6 +4,8 @@ use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
 use validator::Validate;
 
+use crate::common::response::PaginationOptions;
+use crate::common::to_sql::ToSqlString;
 use crate::common::utils::EMAIL_SUFFIX;
 
 #[derive(Deserialize, Debug)]
@@ -23,7 +25,7 @@ pub(crate) struct UserPasswordLogin {
     password: String,
 }
 
-#[derive(Debug, Validate, Deserialize)]
+#[derive(Debug, Validate, Deserialize, Serialize)]
 pub(crate) struct RegisterEmail {
     #[validate(length(max = 50, message = "invalid field length"))]
     pub first_name: Option<String>,
@@ -59,12 +61,14 @@ pub(crate) struct EmailChange {
     new_password: String,
 }
 
-#[derive(Debug, Deserialize, Validate, Serialize)]
+#[derive(Debug, Deserialize, Validate, Serialize, ToSqlString)]
 pub struct UserQuery {
     #[validate(length(min = 3, max = 100, message = "invalid field length"))]
     pub email: Option<String>,
     pub is_active: Option<bool>,
     #[validate(length(min = 3, max = 50, message = "invalid field length"))]
-    pub name: Option<String>,
+    pub first_name: Option<String>,
+    #[validate(length(min = 3, max = 50, message = "invalid field length"))]
+    pub last_name: Option<String>,
     pub create_at: Option<DateTime<Utc>>,
 }

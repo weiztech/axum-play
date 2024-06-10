@@ -1,5 +1,5 @@
 [package]
-name = "axum_web"
+name = "web_axum"
 version = "0.1.0"
 edition = "2021"
 
@@ -14,6 +14,7 @@ async-trait = "0.1.77"
 regex = "1.9.5"
 once_cell = "1.18.0"
 base62 = "2.0.2"
+macros = { path = "../macros" }
 
 [dependencies.pbkdf2]
 version = "0.12.2"
