@@ -21,7 +21,7 @@ fn impl_tosqlstr_macro(ast: &syn::DeriveInput) -> TokenStream {
                 let field_name = &field.ident;
 
                 quote! {
-                    if (!self.#field_name.is_none()){
+                    if (self.#field_name.is_some()){
                         query_str += format!(
                         "{} {} {} ${} ",
                         if query_str.len() == 0 {"WHERE"} else {separator},
@@ -52,7 +52,7 @@ fn impl_tosqlstr_macro(ast: &syn::DeriveInput) -> TokenStream {
                         let mut query_param: Vec<String> = Vec::new();
                         #(#field_operations)*
 
-                        if let Some(previous) = &pagination.previous{
+                        if let Some(next) = &pagination.next{
                             query_str += format!(
                                 "{} {} < ${} ",
                                 if query_str.len() == 0 {"WHERE"} else {separator},
@@ -60,7 +60,7 @@ fn impl_tosqlstr_macro(ast: &syn::DeriveInput) -> TokenStream {
                                 counter,
                             ).as_str();
 
-                            query_param.push(previous.to_string());
+                            query_param.push(next.to_string());
                             counter += 1;
                         }
 
@@ -72,7 +72,7 @@ fn impl_tosqlstr_macro(ast: &syn::DeriveInput) -> TokenStream {
                         if let Some(limit) = pagination.limit{
                             query_str += format!(
                                 "limit {}",
-                                limit,
+                                limit + 1,
                             ).as_str();
                         }
                         (query_str, query_param)

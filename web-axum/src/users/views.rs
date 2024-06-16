@@ -53,8 +53,9 @@ pub async fn user_list(
             .map(|val| val as &(dyn tokio_postgres::types::ToSql + Sync))
             .collect();
 
+    let pagination_size = pagination.limit.unwrap() as usize;
     let rows = conn.query(sql_query.as_str(), &sql_value).await?;
-    let users: Vec<User> = rows
+    let users: Vec<User> = rows[..rows.len().min(pagination_size)]
         .iter()
         .map(|row| User {
             id: Some(Cow::Owned(row.get(0))),
@@ -70,17 +71,11 @@ pub async fn user_list(
         })
         .collect();
 
-    let total_user = users.len() as u32;
-    let last_user_id = users.last().unwrap().id.as_ref().unwrap().to_string();
     Ok(Json(ListResponse {
-        items: users,
+        data: users,
         pagination: PaginationOptions {
-            previous: None,
-            next_previous: if total_user == pagination.limit.unwrap() {
-                Some(last_user_id)
-            } else {
-                None
-            },
+            next: None,
+            has_next: Some(rows.len() > pagination_size),
             limit: pagination.limit,
         },
     })
