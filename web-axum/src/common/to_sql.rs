@@ -1,4 +1,3 @@
-use crate::common::response::PaginationOptions;
 pub use macros::ToSqlString;
 
 pub trait ToSqlString {
@@ -7,6 +6,5 @@ pub trait ToSqlString {
         operator: &str,
         separator: &str,
         order_by: &str,
-        pagination: &PaginationOptions,
     ) -> (String, Vec<String>);
 }

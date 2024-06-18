@@ -1,11 +1,11 @@
 use axum::{debug_handler, response::IntoResponse, Json};
-use serde_json::Value;
 use std::borrow::Cow;
 
 use crate::common::error::Result;
 use crate::common::extractor::{JSONValidate, QueryValidate};
 use crate::common::response::{ListResponse, PaginationOptions};
 use crate::db::extractors::{ConnectionPool, DatabaseConnection};
+use crate::db::query::Builder;
 use crate::users::schema::{RegisterEmail, UserPasswordLogin, UserQuery};
 use crate::users::{db::create_user, models::User};
 
@@ -41,21 +41,27 @@ pub async fn user_list(
     QueryValidate(filter): QueryValidate<UserQuery>,
     QueryValidate(pagination): QueryValidate<PaginationOptions>,
 ) -> Result<impl IntoResponse> {
-    let (query, query_param) =
-        filter.as_sql_string("ILIKE", "AND", "id DESC", &pagination);
+    let (query, mut query_param) =
+        filter.as_sql_string("ILIKE", "AND", "id DESC");
 
-    let sql_query = format!("\
-        select id, email, image, username, first_name, last_name, is_active, create_at, \
-        update_at, last_login from users {} ", query);
-    let sql_value: Vec<&(dyn tokio_postgres::types::ToSql + Sync)> =
-        query_param
-            .iter()
-            .map(|val| val as &(dyn tokio_postgres::types::ToSql + Sync))
-            .collect();
+    let mut query_str =
+        "select id, email, image, username, first_name, last_name, \
+    is_active, create_at, update_at, last_login from users "
+            .to_string()
+            + query.as_str();
+    let (rows, has_next) = Builder::query(
+        &conn,
+        &mut query_str,
+        &mut query_param,
+        None,
+        Some(&pagination),
+    )
+    .await?;
 
-    let pagination_size = pagination.limit.unwrap() as usize;
-    let rows = conn.query(sql_query.as_str(), &sql_value).await?;
-    let users: Vec<User> = rows[..rows.len().min(pagination_size)]
+    // println!("Query: {}", query_str);
+    // println!("Query Param: {:?}", query_param);
+    let users: Vec<User> = rows
+        [..rows.len().min(pagination.limit.unwrap() as usize)]
         .iter()
         .map(|row| User {
             id: Some(Cow::Owned(row.get(0))),
@@ -75,7 +81,7 @@ pub async fn user_list(
         data: users,
         pagination: PaginationOptions {
             next: None,
-            has_next: Some(rows.len() > pagination_size),
+            has_next: Some(has_next),
             limit: pagination.limit,
         },
     })

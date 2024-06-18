@@ -21,10 +21,10 @@ pub struct PaginationOptions {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[validate(range(min = 1, max = 25, message = "invalid range value"))]
     #[serde(default = "default_pagination_limit")]
-    pub limit: Option<u32>,
+    pub limit: Option<u8>,
 }
 
-fn default_pagination_limit() -> Option<u32> {
+fn default_pagination_limit() -> Option<u8> {
     Some(10)
 }
 

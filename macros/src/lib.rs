@@ -45,36 +45,12 @@ fn impl_tosqlstr_macro(ast: &syn::DeriveInput) -> TokenStream {
                         operator: &str,
                         separator: &str,
                         order_by: &str,
-                        pagination: &PaginationOptions,
                     ) -> (String, Vec<String>) {
                         let mut counter = 1;
                         let mut query_str = String::new();
                         let mut query_param: Vec<String> = Vec::new();
                         #(#field_operations)*
 
-                        if let Some(next) = &pagination.next{
-                            query_str += format!(
-                                "{} {} < ${} ",
-                                if query_str.len() == 0 {"WHERE"} else {separator},
-                                "id",
-                                counter,
-                            ).as_str();
-
-                            query_param.push(next.to_string());
-                            counter += 1;
-                        }
-
-                        query_str += format!(
-                            "ORDER BY {} ",
-                            order_by,
-                        ).as_str();
-
-                        if let Some(limit) = pagination.limit{
-                            query_str += format!(
-                                "limit {}",
-                                limit + 1,
-                            ).as_str();
-                        }
                         (query_str, query_param)
                     }
                 }

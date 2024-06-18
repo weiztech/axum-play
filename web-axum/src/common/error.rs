@@ -76,13 +76,14 @@ impl IntoResponse for AppError {
                             .into_response()
                     }
                     Some(err) => {
-                        error!("Unexpected - DB save error code {:?}", err);
-                        (StatusCode::BAD_REQUEST, "data save error")
+                        error!("Unexpected - DB related error {:?}", err);
+                        (StatusCode::BAD_REQUEST, "Unexpected error")
                             .into_response()
                     }
                     _ => {
-                        error!("Unexpected - DB save error {:?}", error);
-                        (StatusCode::BAD_REQUEST, "Failed save").into_response()
+                        error!("Unexpected - error {:?}", error);
+                        (StatusCode::BAD_REQUEST, "Failed to proceed")
+                            .into_response()
                     }
                 };
             }
