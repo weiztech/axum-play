@@ -20,6 +20,7 @@ pub enum AppError {
     DBError(tokio_postgres::Error),
     ValidationErrors(ValidationErrors),
     ErrorResponse(ErrorResponse),
+    NotFound(String),
 }
 
 impl IntoResponse for AppError {
@@ -68,10 +69,10 @@ impl IntoResponse for AppError {
                             HashMap::from([(field_name, Cow::Owned(message))]);
                         (
                             StatusCode::BAD_REQUEST,
-                            Json(ErrorResponse {
+                            ErrorResponse {
                                 error: None,
                                 errors: Some(errors),
-                            }),
+                            },
                         )
                             .into_response()
                     }
@@ -91,6 +92,14 @@ impl IntoResponse for AppError {
                 ErrorResponse::from(err).into_response()
             }
             AppError::ErrorResponse(err) => err.into_response(),
+            AppError::NotFound(message) => (
+                StatusCode::NOT_FOUND,
+                ErrorResponse {
+                    errors: None,
+                    error: Some(Cow::Owned(message)),
+                },
+            )
+                .into_response(),
         };
     }
 }

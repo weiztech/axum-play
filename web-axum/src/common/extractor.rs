@@ -46,6 +46,7 @@ impl From<QueryRejection> for ValidateRejection {
 
 impl IntoResponse for ValidateRejection {
     fn into_response(self) -> Response {
+        println!("ValidateRejection: {:?}", self);
         let error_response = match self {
             ValidateRejection::JsonRejection(err) => ErrorResponse::from(err),
             ValidateRejection::QueryRejection(err) => {

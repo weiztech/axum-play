@@ -67,5 +67,8 @@ features = ["trace", "request-id", "sensitive-headers", "catch-panic"]
 version = "0.16.1"
 features = ["derive"]
 
+[dependencies.serde_with]
+version = "3.8.3"
+
 [dev-dependencies]
 cargo-watch = "8.4.0"

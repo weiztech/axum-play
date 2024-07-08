@@ -9,13 +9,13 @@ use crate::common::to_sql::ToSqlString;
 use crate::common::utils::EMAIL_SUFFIX;
 
 #[derive(Deserialize, Debug)]
-pub(crate) struct UserProfile {
+pub struct UserProfile {
     first_name: Option<String>,
     last_name: Option<String>,
 }
 
 #[derive(Debug, Deserialize, Validate)]
-pub(crate) struct UserPasswordLogin {
+pub struct UserPasswordLogin {
     #[validate(
         email(message = "invalid email value"),
         length(min = 5, max = 60, message = "invalid field length"),
@@ -26,7 +26,7 @@ pub(crate) struct UserPasswordLogin {
 }
 
 #[derive(Debug, Validate, Deserialize, Serialize)]
-pub(crate) struct RegisterEmail {
+pub struct RegisterEmail {
     #[validate(length(max = 50, message = "invalid field length"))]
     pub first_name: Option<String>,
     #[validate(length(max = 50, message = "invalid field length"))]
@@ -55,7 +55,7 @@ pub(crate) struct RegisterEmail {
 }
 
 #[derive(Debug, Deserialize)]
-pub(crate) struct EmailChange {
+pub struct EmailChange {
     email: String,
     password: String,
     new_password: String,
@@ -71,4 +71,13 @@ pub struct UserQuery {
     #[validate(length(min = 3, max = 50, message = "invalid field length"))]
     pub last_name: Option<String>,
     pub create_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Debug, Deserialize, Validate)]
+pub struct ProfileChange {
+    #[serde(default, with = "::serde_with::rust::double_option")]
+    pub first_name: Option<Option<String>>,
+    #[serde(default, with = "::serde_with::rust::double_option")]
+    #[validate(length(min = 3, max = 50, message = "invalid field length"))]
+    pub last_name: Option<Option<String>>,
 }
